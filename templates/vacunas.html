@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema Ganadero - Vacunas{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Módulo de Vacunas</h2>
+    <div class="row">
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="ri-virus-line ri-3x mb-3 text-primary"></i>
+                    <h5 class="card-title">Desparasitación</h5>
+                    <p class="card-text">Registro y seguimiento de tratamientos antiparasitarios.</p>
+                    <a href="{{ url_for('desparasitacion') }}" class="btn btn-primary">
+                        <i class="ri-arrow-right-line"></i> Acceder
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="ri-medicine-bottle-line ri-3x mb-3 text-success"></i>
+                    <h5 class="card-title">Vitaminización</h5>
+                    <p class="card-text">Control de suplementos vitamínicos y minerales.</p>
+                    <a href="{{ url_for('vitaminizacion') }}" class="btn btn-success">
+                        <i class="ri-arrow-right-line"></i> Acceder
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="ri-thermometer-line ri-3x mb-3 text-warning"></i>
+                    <h5 class="card-title">Fiebre Aftosa</h5>
+                    <p class="card-text">Seguimiento de vacunación contra la fiebre aftosa.</p>
+                    <a href="{{ url_for('fiebre_aftosa') }}" class="btn btn-warning">
+                        <i class="ri-arrow-right-line"></i> Acceder
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="ri-test-tube-line ri-3x mb-3 text-danger"></i>
+                    <h5 class="card-title">Carbunco</h5>
+                    <p class="card-text">Control de vacunación contra el carbunco.</p>
+                    <a href="{{ url_for('carbunco') }}" class="btn btn-danger">
+                        <i class="ri-arrow-right-line"></i> Acceder
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-body {
+        padding: 2rem;
+    }
+
+    .btn {
+        border-radius: 50px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 500;
+    }
+
+    .btn i {
+        margin-right: 5px;
+    }
+
+    .ri-3x {
+        font-size: 3rem;
+    }
+</style>
+{% endblock %}

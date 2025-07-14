@@ -1,0 +1,53 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block contenido %}
+<h2>Reporte de Producción - {{ periodo }}</h2>
+
+<div class="resumen">
+    <p>Total producción de leche: <span class="total">{{ total_leche }} litros</span></p>
+    <p>Promedio diario: {{ promedio_diario }} litros</p>
+    <p>Valor total estimado: ${{ valor_total|round(2) }}</p>
+</div>
+
+<h3>Producción de Leche por Día</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Cantidad (litros)</th>
+            <th>Valor Estimado</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for registro in registros_leche %}
+        <tr>
+            <td>{{ registro.fecha }}</td>
+            <td>{{ registro.cantidad }}</td>
+            <td>${{ registro.valor|round(2) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Producción por Animal</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Animal</th>
+            <th>Total (litros)</th>
+            <th>Promedio Diario</th>
+            <th>Días en Producción</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for animal in produccion_por_animal %}
+        <tr>
+            <td>{{ animal.nombre }}</td>
+            <td>{{ animal.total }}</td>
+            <td>{{ animal.promedio }}</td>
+            <td>{{ animal.dias }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

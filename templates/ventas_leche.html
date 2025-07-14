@@ -1,0 +1,872 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <!-- Encabezado con título y botón de nueva venta -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-money-bill-wave me-2 text-primary"></i>Registro de Ventas de Leche</h1>
+            <p class="mb-0 text-muted">Gestión y seguimiento de las ventas de producción láctea</p>
+        </div>
+        <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalVentaLeche">
+            <i class="fas fa-plus me-2"></i>Nueva Venta
+        </button>
+    </div>
+
+    <!-- Alertas de mensajes flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Tarjetas de resumen mejoradas -->
+    <div class="row mb-4">
+        <!-- Tarjeta: Total vendido hoy -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Vendido Hoy</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_hoy }} L</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-primary text-white">
+                                <i class="fas fa-milk-carton"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Ingresos hoy -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Ingresos Hoy</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">$ {{ ingresos_hoy }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-success text-white">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Total mes -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total Mes</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_mes }} L</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-info text-white">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Ingresos mes -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Ingresos Mes</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">$ {{ ingresos_mes }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-warning text-white">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros y tabla de datos -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">Registro de Ventas</h6>
+            <div class="dropdown no-arrow">
+                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end shadow animated--fade-in">
+                    <div class="dropdown-header">Opciones:</div>
+                    <a class="dropdown-item" href="#" id="btnExportarCSV"><i class="fas fa-file-csv fa-sm fa-fw me-2 text-gray-400"></i>Exportar CSV</a>
+                    <a class="dropdown-item" href="#" id="btnImprimirVentas"><i class="fas fa-print fa-sm fa-fw me-2 text-gray-400"></i>Imprimir</a>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros mejorados -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filtroFecha" class="small font-weight-bold text-primary">Fecha</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                            <input type="date" class="form-control" id="filtroFecha">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filtroEstado" class="small font-weight-bold text-primary">Estado</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                            <select class="form-select" id="filtroEstado">
+                                <option value="">Todos los estados</option>
+                                <option value="Pagado">Pagado</option>
+                                <option value="Pendiente">Pendiente</option>
+                                <option value="Parcial">Parcial</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filtroComprador" class="small font-weight-bold text-primary">Comprador</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" class="form-control" id="filtroComprador" placeholder="Buscar comprador...">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-outline-secondary w-100" id="btnLimpiarFiltros">
+                        <i class="fas fa-broom me-2"></i>Limpiar filtros
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla de ventas mejorada -->
+            <div class="table-responsive">
+                <table class="table table-hover" id="tablaVentasLeche">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-primary"><i class="fas fa-calendar-day me-1"></i> Fecha</th>
+                            <th class="text-primary"><i class="fas fa-milk-carton me-1"></i> Cantidad (L)</th>
+                            <th class="text-primary"><i class="fas fa-tag me-1"></i> Precio/L</th>
+                            <th class="text-primary"><i class="fas fa-dollar-sign me-1"></i> Total</th>
+                            <th class="text-primary"><i class="fas fa-user me-1"></i> Comprador</th>
+                            <th class="text-primary"><i class="fas fa-credit-card me-1"></i> Forma de Pago</th>
+                            <th class="text-primary"><i class="fas fa-check-circle me-1"></i> Estado</th>
+                            <th class="text-primary text-center"><i class="fas fa-cogs me-1"></i> Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for venta in ventas %}
+                        <tr data-fecha="{{ venta.fecha }}" data-estado="{{ venta.estado_pago }}" data-comprador="{{ venta.comprador }}">
+                            <td>{{ venta.fecha }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress me-2" style="width: 60px; height: 8px;">
+                                        <div class="progress-bar bg-info" role="progressbar" style="width: {{ (venta.cantidad_litros / 100) * 100 }}%" aria-valuenow="{{ venta.cantidad_litros }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    <span>{{ venta.cantidad_litros }} L</span>
+                                </div>
+                            </td>
+                            <td>$ {{ "%.2f"|format(venta.precio_litro) }}</td>
+                            <td class="font-weight-bold">$ {{ "%.2f"|format(venta.total_venta) }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="icon-circle bg-primary bg-opacity-10 me-2">
+                                        <i class="fas fa-user text-primary"></i>
+                                    </div>
+                                    <span>{{ venta.comprador }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if venta.forma_pago == 'Efectivo' %}
+                                    <span class="badge bg-success text-white"><i class="fas fa-money-bill-wave me-1"></i> Efectivo</span>
+                                {% elif venta.forma_pago == 'Transferencia' %}
+                                    <span class="badge bg-info text-white"><i class="fas fa-exchange-alt me-1"></i> Transferencia</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark"><i class="fas fa-credit-card me-1"></i> Crédito</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge rounded-pill {% if venta.estado_pago == 'Pagado' %}bg-success{% elif venta.estado_pago == 'Parcial' %}bg-warning text-dark{% else %}bg-danger{% endif %} px-2 py-1">
+                                    <i class="fas {% if venta.estado_pago == 'Pagado' %}fa-check-circle{% elif venta.estado_pago == 'Parcial' %}fa-clock{% else %}fa-exclamation-circle{% endif %} me-1"></i>
+                                    {{ venta.estado_pago }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group">
+
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarVenta({{ venta.id }})" data-bs-toggle="tooltip" title="Editar venta">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarVenta({{ venta.id }})" data-bs-toggle="tooltip" title="Eliminar venta">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <!-- Mensaje cuando no hay resultados -->
+                <div id="sin-resultados" class="text-center py-5 d-none">
+                    <i class="fas fa-search fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-gray-500 mb-0">No se encontraron ventas con los filtros seleccionados</p>
+                    <button class="btn btn-outline-primary mt-3" id="btnLimpiarFiltrosResultados">
+                        <i class="fas fa-broom me-2"></i>Limpiar filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nueva venta -->
+<div class="modal fade" id="modalVentaLeche" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nueva Venta de Leche</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formVentaLeche" method="POST" action="{{ url_for('agregar_venta_leche') }}">
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cantidad_litros" class="form-label">Cantidad (L)</label>
+                        <input type="number" step="0.01" class="form-control" id="cantidad_litros" name="cantidad_litros" required onchange="calcularTotal()">
+                    </div>
+                    <div class="mb-3">
+                        <label for="precio_litro" class="form-label">Precio por Litro ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="precio_litro" name="precio_litro" required onchange="calcularTotal()">
+                    </div>
+                    <div class="mb-3">
+                        <label for="total" class="form-label">Total ($)</label>
+                        <input type="text" class="form-control" id="total" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comprador" class="form-label">Comprador</label>
+                        <input type="text" class="form-control" id="comprador" name="comprador" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="forma_pago" class="form-label">Forma de Pago</label>
+                        <select class="form-select" id="forma_pago" name="forma_pago" required>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="estado_pago" class="form-label">Estado del Pago</label>
+                        <select class="form-select" id="estado_pago" name="estado_pago" required>
+                            <option value="Pagado">Pagado</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Parcial">Parcial</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formVentaLeche" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar venta -->
+<div class="modal fade" id="modalEditarVentaLeche" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Venta de Leche</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarVentaLeche" method="POST">
+                    <input type="hidden" id="editar_id" name="editar_id">
+                    <div class="mb-3">
+                        <label for="editar_fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="editar_fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editar_cantidad_litros" class="form-label">Cantidad (L)</label>
+                        <input type="number" step="0.01" class="form-control" id="editar_cantidad_litros" name="cantidad_litros" required onchange="calcularTotalEditar()">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editar_precio_litro" class="form-label">Precio por Litro ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="editar_precio_litro" name="precio_litro" required onchange="calcularTotalEditar()">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editar_total" class="form-label">Total ($)</label>
+                        <input type="text" class="form-control" id="editar_total" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editar_comprador" class="form-label">Comprador</label>
+                        <input type="text" class="form-control" id="editar_comprador" name="comprador" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editar_forma_pago" class="form-label">Forma de Pago</label>
+                        <select class="form-select" id="editar_forma_pago" name="forma_pago" required>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editar_estado_pago" class="form-label">Estado del Pago</label>
+                        <select class="form-select" id="editar_estado_pago" name="estado_pago" required>
+                            <option value="Pagado">Pagado</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Parcial">Parcial</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarEdicion()">Actualizar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Crear estilos para los elementos visuales
+    const style = document.createElement('style');
+    style.textContent = `
+        .border-left-primary {
+            border-left: 4px solid #4e73df;
+        }
+        .border-left-success {
+            border-left: 4px solid #1cc88a;
+        }
+        .border-left-info {
+            border-left: 4px solid #36b9cc;
+        }
+        .border-left-warning {
+            border-left: 4px solid #f6c23e;
+        }
+        .icon-circle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+        }
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        }
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+        }
+        .bg-gradient-info {
+            background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
+        }
+        .bg-gradient-warning {
+            background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);
+        }
+        .bg-opacity-10 {
+            opacity: 0.1;
+        }
+        .text-gray-800 {
+            color: #5a5c69 !important;
+        }
+        .text-gray-500 {
+            color: #b7b9cc !important;
+        }
+        .text-gray-300 {
+            color: #dddfeb !important;
+        }
+        .text-xs {
+            font-size: 0.7rem;
+        }
+        .font-weight-bold {
+            font-weight: 700 !important;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Configurar eventos para filtros
+    document.getElementById('filtroFecha').addEventListener('change', filtrarVentasDinamico);
+    document.getElementById('filtroEstado').addEventListener('change', filtrarVentasDinamico);
+    document.getElementById('filtroComprador').addEventListener('input', filtrarVentasDinamico);
+    
+    // Configurar botón para limpiar filtros
+    document.getElementById('btnLimpiarFiltros').addEventListener('click', limpiarFiltros);
+    if (document.getElementById('btnLimpiarFiltrosResultados')) {
+        document.getElementById('btnLimpiarFiltrosResultados').addEventListener('click', limpiarFiltros);
+    }
+    
+    // Configurar botones de exportación
+    if (document.getElementById('btnExportarCSV')) {
+        document.getElementById('btnExportarCSV').addEventListener('click', exportarCSV);
+    }
+    if (document.getElementById('btnImprimirVentas')) {
+        document.getElementById('btnImprimirVentas').addEventListener('click', imprimirVentas);
+    }
+});
+
+// Función para filtrado dinámico (sin recargar la página)
+function filtrarVentasDinamico() {
+    const fecha = document.getElementById('filtroFecha').value;
+    const estado = document.getElementById('filtroEstado').value;
+    const comprador = document.getElementById('filtroComprador').value.toLowerCase();
+    
+    const filas = document.querySelectorAll('#tablaVentasLeche tbody tr');
+    let contadorVisible = 0;
+    
+    filas.forEach(fila => {
+        const filaFecha = fila.getAttribute('data-fecha');
+        const filaEstado = fila.getAttribute('data-estado');
+        const filaComprador = fila.getAttribute('data-comprador').toLowerCase();
+        
+        let mostrar = true;
+        
+        // Aplicar filtros
+        if (fecha && filaFecha !== fecha) {
+            mostrar = false;
+        }
+        
+        if (estado && filaEstado !== estado) {
+            mostrar = false;
+        }
+        
+        if (comprador && !filaComprador.includes(comprador)) {
+            mostrar = false;
+        }
+        
+        // Mostrar u ocultar fila
+        fila.style.display = mostrar ? '' : 'none';
+        if (mostrar) contadorVisible++;
+    });
+    
+    // Mostrar mensaje de no hay resultados si es necesario
+    const sinResultados = document.getElementById('sin-resultados');
+    if (contadorVisible === 0) {
+        sinResultados.classList.remove('d-none');
+    } else {
+        sinResultados.classList.add('d-none');
+    }
+}
+
+// Función para limpiar todos los filtros
+function limpiarFiltros() {
+    document.getElementById('filtroFecha').value = '';
+    document.getElementById('filtroEstado').value = '';
+    document.getElementById('filtroComprador').value = '';
+    
+    // Mostrar todas las filas
+    const filas = document.querySelectorAll('#tablaVentasLeche tbody tr');
+    filas.forEach(fila => {
+        fila.style.display = '';
+    });
+    
+    // Ocultar mensaje de no hay resultados
+    document.getElementById('sin-resultados').classList.add('d-none');
+}
+
+// Función para calcular el total de una venta
+function calcularTotal() {
+    var cantidad = parseFloat(document.getElementById('cantidad_litros').value) || 0;
+    var precio = parseFloat(document.getElementById('precio_litro').value) || 0;
+    document.getElementById('total').value = (cantidad * precio).toFixed(2);
+}
+
+function calcularTotalEditar() {
+    var cantidad = parseFloat(document.getElementById('editar_cantidad_litros').value) || 0;
+    var precio = parseFloat(document.getElementById('editar_precio_litro').value) || 0;
+    document.getElementById('editar_total').value = (cantidad * precio).toFixed(2);
+}
+
+// Función para ver detalles de una venta
+function verDetallesVenta(id) {
+    fetch('/obtener_venta_leche/' + id)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al obtener los datos de la venta');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Crear contenido HTML para el modal de detalles
+            const estado = data.estado_pago;
+            const estadoColor = estado === 'Pagado' ? 'success' : (estado === 'Parcial' ? 'warning' : 'danger');
+            const formaPago = data.forma_pago;
+            const formaPagoIcon = formaPago === 'Efectivo' ? 'money-bill-wave' : 
+                                (formaPago === 'Transferencia' ? 'exchange-alt' : 'credit-card');
+            
+            Swal.fire({
+                title: `Detalles de Venta`,
+                html: `
+                    <div class="text-start">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle bg-${estadoColor} bg-opacity-10 me-2">
+                                <i class="fas fa-dollar-sign text-${estadoColor}"></i>
+                            </div>
+                            <h5 class="mb-0">Venta #${data.id}</h5>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <p class="mb-1"><strong><i class="fas fa-calendar me-2"></i>Fecha:</strong></p>
+                                <p class="mb-3">${data.fecha}</p>
+                                
+                                <p class="mb-1"><strong><i class="fas fa-milk-carton me-2"></i>Cantidad:</strong></p>
+                                <p class="mb-3">${data.cantidad_litros} litros</p>
+                                
+                                <p class="mb-1"><strong><i class="fas fa-tag me-2"></i>Precio por litro:</strong></p>
+                                <p class="mb-3">$ ${data.precio_litro.toFixed(2)}</p>
+                            </div>
+                            <div class="col-6">
+                                <p class="mb-1"><strong><i class="fas fa-dollar-sign me-2"></i>Total:</strong></p>
+                                <p class="mb-3 h5 text-${estadoColor}">$ ${data.total_venta.toFixed(2)}</p>
+                                
+                                <p class="mb-1"><strong><i class="fas fa-user me-2"></i>Comprador:</strong></p>
+                                <p class="mb-3">${data.comprador}</p>
+                                
+                                <p class="mb-1"><strong><i class="fas fa-${formaPagoIcon} me-2"></i>Forma de pago:</strong></p>
+                                <p class="mb-3">${data.forma_pago}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <p class="mb-1"><strong><i class="fas fa-check-circle me-2"></i>Estado del pago:</strong></p>
+                            <p class="p-2 bg-${estadoColor} bg-opacity-10 rounded text-${estadoColor} text-center">
+                                <i class="fas fa-${estado === 'Pagado' ? 'check-circle' : (estado === 'Parcial' ? 'clock' : 'exclamation-circle')} me-2"></i>
+                                ${data.estado_pago}
+                            </p>
+                        </div>
+                    </div>
+                `,
+                width: '600px',
+                showCancelButton: true,
+                cancelButtonText: 'Cerrar',
+                showDenyButton: true,
+                denyButtonText: 'Editar',
+                denyButtonColor: '#3085d6',
+                confirmButtonText: 'Imprimir',
+                confirmButtonColor: '#1cc88a'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Imprimir detalles
+                    const ventanaImpresion = window.open('', '_blank');
+                    ventanaImpresion.document.write(`
+                        <html>
+                            <head>
+                                <title>Detalles de Venta #${data.id}</title>
+                                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                                <style>
+                                    body { padding: 20px; }
+                                    .header { text-align: center; margin-bottom: 30px; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="header">
+                                    <h3>Comprobante de Venta</h3>
+                                    <p>Sistema Ganadero</p>
+                                </div>
+                                <h4>Detalles de la Venta #${data.id}</h4>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <p><strong>Fecha:</strong> ${data.fecha}</p>
+                                        <p><strong>Cantidad:</strong> ${data.cantidad_litros} litros</p>
+                                        <p><strong>Precio por litro:</strong> $ ${data.precio_litro.toFixed(2)}</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p><strong>Total:</strong> $ ${data.total_venta.toFixed(2)}</p>
+                                        <p><strong>Comprador:</strong> ${data.comprador}</p>
+                                        <p><strong>Forma de pago:</strong> ${data.forma_pago}</p>
+                                        <p><strong>Estado del pago:</strong> ${data.estado_pago}</p>
+                                    </div>
+                                </div>
+                                <hr>
+                                <p class="text-center">Documento generado el ${new Date().toLocaleString()}</p>
+                            </body>
+                        </html>
+                    `);
+                    ventanaImpresion.document.close();
+                    ventanaImpresion.print();
+                } else if (result.isDenied) {
+                    // Editar venta
+                    editarVenta(data.id);
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Error al cargar los detalles de la venta: ' + error.message,
+                icon: 'error'
+            });
+        });
+}
+
+// Función para exportar a CSV
+function exportarCSV() {
+    const tabla = document.getElementById('tablaVentasLeche');
+    const filas = tabla.querySelectorAll('tbody tr:not([style*="display: none"])');
+    
+    if (filas.length === 0) {
+        Swal.fire({
+            title: 'Sin datos',
+            text: 'No hay datos para exportar',
+            icon: 'warning'
+        });
+        return;
+    }
+    
+    let csv = 'Fecha,Cantidad (L),Precio/L,Total,Comprador,Forma de Pago,Estado\n';
+    
+    filas.forEach(fila => {
+        const fecha = fila.querySelector('td:nth-child(1)').textContent.trim();
+        const cantidad = fila.querySelector('td:nth-child(2)').textContent.trim().replace(' L', '');
+        const precio = fila.querySelector('td:nth-child(3)').textContent.trim().replace('$ ', '');
+        const total = fila.querySelector('td:nth-child(4)').textContent.trim().replace('$ ', '');
+        const comprador = fila.querySelector('td:nth-child(5)').textContent.trim();
+        const formaPago = fila.querySelector('td:nth-child(6)').textContent.trim();
+        const estado = fila.querySelector('td:nth-child(7)').textContent.trim();
+        
+        // Escapar comillas en textos
+        const compradorEscapado = comprador.replace(/"/g, '""');
+        
+        csv += `"${fecha}","${cantidad}","${precio}","${total}","${compradorEscapado}","${formaPago}","${estado}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'ventas_leche_' + new Date().toISOString().split('T')[0] + '.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Función para imprimir ventas
+function imprimirVentas() {
+    const tabla = document.getElementById('tablaVentasLeche');
+    const filas = tabla.querySelectorAll('tbody tr:not([style*="display: none"])');
+    
+    if (filas.length === 0) {
+        Swal.fire({
+            title: 'Sin datos',
+            text: 'No hay datos para imprimir',
+            icon: 'warning'
+        });
+        return;
+    }
+    
+    const ventanaImpresion = window.open('', '_blank');
+    let contenidoTabla = '';
+    
+    filas.forEach(fila => {
+        const fecha = fila.querySelector('td:nth-child(1)').textContent.trim();
+        const cantidad = fila.querySelector('td:nth-child(2)').textContent.trim();
+        const precio = fila.querySelector('td:nth-child(3)').textContent.trim();
+        const total = fila.querySelector('td:nth-child(4)').textContent.trim();
+        const comprador = fila.querySelector('td:nth-child(5)').textContent.trim();
+        const formaPago = fila.querySelector('td:nth-child(6)').textContent.trim();
+        const estado = fila.querySelector('td:nth-child(7)').textContent.trim();
+        
+        contenidoTabla += `
+            <tr>
+                <td>${fecha}</td>
+                <td>${cantidad}</td>
+                <td>${precio}</td>
+                <td>${total}</td>
+                <td>${comprador}</td>
+                <td>${formaPago}</td>
+                <td>${estado}</td>
+            </tr>
+        `;
+    });
+    
+    ventanaImpresion.document.write(`
+        <html>
+            <head>
+                <title>Registro de Ventas de Leche</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding: 20px; }
+                    .header { text-align: center; margin-bottom: 30px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h3>Registro de Ventas de Leche</h3>
+                    <p>Sistema Ganadero - Fecha: ${new Date().toLocaleDateString()}</p>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Cantidad</th>
+                            <th>Precio/L</th>
+                            <th>Total</th>
+                            <th>Comprador</th>
+                            <th>Forma de Pago</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${contenidoTabla}
+                    </tbody>
+                </table>
+                <div class="mt-4">
+                    <p><strong>Total de registros:</strong> ${filas.length}</p>
+                </div>
+                <hr>
+                <p class="text-center">Documento generado el ${new Date().toLocaleString()}</p>
+            </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
+    ventanaImpresion.print();
+}
+
+function guardarEdicion() {
+    const id = document.getElementById('editar_id').value;
+    const form = document.getElementById('formEditarVentaLeche');
+    
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    const formData = new FormData(form);
+    
+    fetch('/ventas_leche/editar/' + id, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error al editar la venta');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarVentaLeche'));
+            modal.hide();
+            
+            Swal.fire({
+                title: 'Éxito',
+                text: 'Venta actualizada correctamente',
+                icon: 'success'
+            }).then(() => {
+                // Recargar la página para mostrar los datos actualizados
+                window.location.reload();
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        Swal.fire({
+            title: 'Error',
+            text: 'Error al actualizar la venta',
+            icon: 'error'
+        });
+    });
+}
+
+function filtrarVentas() {
+    const fecha = document.getElementById('filtroFecha').value;
+    const estado = document.getElementById('filtroEstado').value;
+    
+    window.location.href = `${window.location.pathname}?fecha=${fecha}&estado=${estado}`;
+}
+
+function editarVenta(id) {
+    // Obtener los datos de la venta
+    fetch(`/ventas_leche/editar/${id}`, {
+        method: 'GET',
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Llenar el formulario con los datos
+        document.getElementById('editar_id').value = data.id;
+        document.getElementById('editar_fecha').value = data.fecha;
+        document.getElementById('editar_cantidad_litros').value = data.cantidad_litros;
+        document.getElementById('editar_precio_litro').value = data.precio_litro;
+        document.getElementById('editar_comprador').value = data.comprador;
+        document.getElementById('editar_forma_pago').value = data.forma_pago;
+        document.getElementById('editar_estado_pago').value = data.estado_pago;
+        
+        // Calcular el total
+        const total = data.cantidad_litros * data.precio_litro;
+        document.getElementById('editar_total').value = total.toFixed(2);
+        
+        // Abrir el modal
+        const modal = new bootstrap.Modal(document.getElementById('modalEditarVentaLeche'));
+        modal.show();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        Swal.fire({
+            title: 'Error',
+            text: 'Error al cargar los datos de la venta',
+            icon: 'error'
+        });
+    });
+}
+
+function eliminarVenta(id) {
+    if (confirm('¿Está seguro de que desea eliminar esta venta?')) {
+        fetch(`/ventas_leche/eliminar/${id}`, {
+            method: 'DELETE',
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al eliminar la venta');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar la venta');
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

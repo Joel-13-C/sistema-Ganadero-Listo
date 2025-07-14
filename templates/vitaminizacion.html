@@ -1,0 +1,747 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema Ganadero - Vitaminización{% endblock %}
+
+{% block extra_css %}
+<style>
+.card {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    border: none;
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: white;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 15px 20px;
+    font-weight: 500;
+    border: none;
+}
+
+.card-title {
+    margin-bottom: 0;
+    font-weight: 600;
+}
+
+.table th {
+    background-color: #FFF3E0;
+    font-weight: 600;
+    border-top: none;
+    padding: 12px 15px;
+}
+
+.table td {
+    padding: 12px 15px;
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 152, 0, 0.05);
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.5em 0.8em;
+    border-radius: 30px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.badge.bg-success {
+    background-color: #FF9800 !important;
+}
+
+.badge.bg-info {
+    background-color: #FB8C00 !important;
+}
+
+.btn-primary {
+    background-color: #F57C00;
+    border-color: #F57C00;
+    padding: 8px 20px;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #EF6C00;
+    border-color: #EF6C00;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-info {
+    background-color: #FB8C00;
+    border-color: #FB8C00;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #F57C00;
+    border-color: #F57C00;
+    color: white;
+}
+
+.form-control, .form-select {
+    border-radius: 5px;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    transition: all 0.3s;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #FF9800;
+    box-shadow: 0 0 0 0.2rem rgba(255, 152, 0, 0.25);
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #424242;
+}
+
+.form-check-input:checked {
+    background-color: #FF9800;
+    border-color: #FF9800;
+}
+
+.alert-info {
+    background-color: #FFF3E0;
+    border-color: #FFE0B2;
+    color: #E65100;
+    border-radius: 8px;
+}
+
+.section-title {
+    position: relative;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-weight: 600;
+    color: #E65100;
+}
+
+.section-title:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 50px;
+    height: 3px;
+    background: #FF9800;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: white;
+    border: none;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.btn-close {
+    color: white;
+    opacity: 1;
+}
+
+.proxima-vencida {
+    color: #D32F2F;
+    font-weight: 500;
+}
+
+.proxima-vigente {
+    color: #F57C00;
+    font-weight: 500;
+}
+
+.animal-row.selected {
+    background-color: rgba(255, 152, 0, 0.1);
+}
+
+.icon-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #FFF3E0;
+    margin-right: 10px;
+}
+
+.icon-container i {
+    color: #F57C00;
+    font-size: 1.2rem;
+}
+
+.stats-card {
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.stats-card-primary {
+    background-color: #FFF3E0;
+    border-left: 4px solid #FF9800;
+}
+
+.stats-card-warning {
+    background-color: #FFF8E1;
+    border-left: 4px solid #FFC107;
+}
+
+.stats-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0;
+    color: #424242;
+}
+
+.stats-label {
+    color: #757575;
+    font-size: 0.9rem;
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex align-items-center mb-4">
+        <div class="icon-container">
+            <i class="ri-medicine-bottle-line"></i>
+        </div>
+        <h2 class="section-title mb-0">Control de Vitaminización</h2>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="stats-card stats-card-primary">
+                <div>
+                    <p class="stats-number">{{ registros|length }}</p>
+                    <p class="stats-label">Total de Vitaminizaciones</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="stats-card stats-card-warning">
+                <div>
+                    <p class="stats-number">{{ proximas_vencidas|default(0) }}</p>
+                    <p class="stats-label">Próximas a Vencer</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title">
+                        <i class="ri-add-line me-2"></i>Registrar Nueva Vitaminización
+                    </h5>
+                    <div>
+                        <button type="button" class="btn btn-success btn-sm" onclick="window.location.href='/generar_reporte_vitaminizacion'">
+                            <i class="fas fa-file-pdf"></i> Generar Reporte Completo
+                        </button>
+                        <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteFechas">
+                            <i class="fas fa-calendar-alt"></i> Reporte por Fechas
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="formVitaminizacion" method="POST" action="{{ url_for('registrar_vitaminizacion') }}">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="fecha_registro" class="form-label">Fecha de Aplicación</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ri-calendar-line"></i></span>
+                                        <input type="date" class="form-control" id="fecha_registro" name="fecha_registro" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="producto" class="form-label">Producto</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ri-medicine-bottle-line"></i></span>
+                                        <select class="form-select" id="producto" name="producto" required>
+                                            <option value="">Seleccione un producto</option>
+                                            <option value="Vitamina AD3E">Vitamina AD3E</option>
+                                            <option value="Complejo B">Complejo B</option>
+                                            <option value="Calcio">Calcio</option>
+                                            <option value="Otro">Otro</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3 d-none" id="otroProducto">
+                                    <label for="otro_producto" class="form-label">Especifique el producto</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ri-edit-line"></i></span>
+                                        <input type="text" class="form-control" id="otro_producto" name="otro_producto">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="aplicador" class="form-label">Aplicador</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ri-user-line"></i></span>
+                                        <input type="text" class="form-control" id="aplicador" name="aplicador" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="form-label">Tipo de Aplicación</label>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_general" value="general" checked>
+                                    <label class="form-check-label" for="aplicacion_general">
+                                        <i class="ri-group-line me-1"></i> General (Todos los animales)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_especifica" value="especifica">
+                                    <label class="form-check-label" for="aplicacion_especifica">
+                                        <i class="ri-user-search-line me-1"></i> Específica (Seleccionar animales)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3 d-none" id="seleccion_animales">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center" style="background: #FFF3E0; color: #E65100;">
+                                        <h6 class="mb-0">Seleccionar Animales</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="seleccionar_todos">
+                                            <label class="form-check-label" for="seleccionar_todos">
+                                                Seleccionar Todos
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width: 50px;"></th>
+                                                        <th>ID</th>
+                                                        <th>Número de Arete</th>
+                                                        <th>Categoría</th>
+                                                        <th>Última Vitaminización</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for animal in animales %}
+                                                    <tr class="animal-row">
+                                                        <td>
+                                                            <input type="checkbox" class="form-check-input animal-checkbox" 
+                                                                   name="animales[]" value="{{ animal.id }}">
+                                                        </td>
+                                                        <td>{{ animal.id }}</td>
+                                                        <td>{{ animal.numero_arete }}</td>
+                                                        <td>{{ animal.categoria }}</td>
+                                                        <td>
+                                                            {% if animal.ultima_vitaminizacion %}
+                                                                <span class="{% if animal.requiere_vitaminizacion %}proxima-vencida{% else %}proxima-vigente{% endif %}">
+                                                                    {{ animal.ultima_vitaminizacion }}
+                                                                </span>
+                                                            {% else %}
+                                                                <span class="text-muted">Sin registro</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="alert alert-info d-flex align-items-center">
+                                    <i class="ri-calendar-event-fill me-2"></i>
+                                    <div>
+                                        <strong>Próxima aplicación recomendada:</strong>
+                                        <span id="proxima_aplicacion">Seleccione una fecha de registro</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="ri-save-line me-2"></i>Registrar Vitaminización
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="ri-history-line me-2"></i>Historial de Vitaminizaciones
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Producto</th>
+                                    <th>Aplicador</th>
+                                    <th>Tipo</th>
+                                    <th>Animales</th>
+                                    <th>Próxima Aplicación</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                <tr>
+                                    <td>{{ registro.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ registro.producto }}</td>
+                                    <td>{{ registro.aplicador }}</td>
+                                    <td>
+                                        {% if registro.aplicacion_general %}
+                                            <span class="badge bg-success">General</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Específica</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if registro.aplicacion_general %}
+                                            <span class="badge bg-light text-dark">Todos</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">{{ registro.cantidad_animales }} animales</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if registro.proxima_aplicacion < hoy %}
+                                            <span class="proxima-vencida">
+                                                <i class="ri-error-warning-line"></i> {{ registro.proxima_aplicacion.strftime('%d/%m/%Y') }}
+                                            </span>
+                                        {% else %}
+                                            <span class="proxima-vigente">
+                                                <i class="ri-check-line"></i> {{ registro.proxima_aplicacion.strftime('%d/%m/%Y') }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-info" 
+                                                onclick="verDetalles('{{ registro.id }}')">
+                                            <i class="ri-eye-line"></i> Ver
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger" 
+                                                onclick="confirmarEliminar('{{ registro.id }}')">
+                                            <i class="ri-delete-bin-line"></i> Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalles -->
+<div class="modal fade" id="detallesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ri-information-line me-2"></i>Detalles de la Vitaminización
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesContenido">
+                <!-- El contenido se carga dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Eliminar -->
+<div class="modal fade" id="eliminarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="ri-error-warning-line me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar este registro de vitaminización? Esta acción no se puede deshacer.</p>
+                <p class="text-danger"><strong>Nota:</strong> Se eliminarán también todos los registros relacionados con los animales.</p>
+            </div>
+            <div class="modal-footer">
+                <form id="formEliminar" method="POST">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="ri-delete-bin-line me-1"></i>Eliminar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal para seleccionar rango de fechas -->
+<div class="modal fade" id="modalReporteFechas" tabindex="-1" aria-labelledby="modalReporteFechasLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalReporteFechasLabel">
+                    <i class="fas fa-calendar-alt me-2"></i>Generar Reporte por Rango de Fechas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formReporteFechas">
+                    <div class="form-group mb-3">
+                        <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                        <input type="date" class="form-control" id="fecha_inicio" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                        <input type="date" class="form-control" id="fecha_fin" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="generarReportePorFechas()">
+                    <i class="fas fa-file-pdf me-2"></i>Generar Reporte
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Función para generar reporte por fechas
+function generarReportePorFechas() {
+    const fechaInicio = document.getElementById('fecha_inicio').value;
+    const fechaFin = document.getElementById('fecha_fin').value;
+
+    if (!fechaInicio || !fechaFin) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Por favor seleccione ambas fechas'
+        });
+        return;
+    }
+
+    if (fechaInicio > fechaFin) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'La fecha de inicio no puede ser mayor que la fecha fin'
+        });
+        return;
+    }
+
+    window.location.href = `/generar_reporte_vitaminizacion/${fechaInicio}/${fechaFin}`;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejo del tipo de aplicación
+    const aplicacionGeneral = document.getElementById('aplicacion_general');
+    const aplicacionEspecifica = document.getElementById('aplicacion_especifica');
+    const seleccionAnimales = document.getElementById('seleccion_animales');
+
+    function toggleSeleccionAnimales() {
+        seleccionAnimales.classList.toggle('d-none', aplicacionGeneral.checked);
+    }
+
+    aplicacionGeneral.addEventListener('change', toggleSeleccionAnimales);
+    aplicacionEspecifica.addEventListener('change', toggleSeleccionAnimales);
+
+    // Manejo de la selección de producto
+    const producto = document.getElementById('producto');
+    const otroProducto = document.getElementById('otroProducto');
+
+    producto.addEventListener('change', function() {
+        otroProducto.classList.toggle('d-none', this.value !== 'Otro');
+    });
+
+    // Cálculo de próxima aplicación
+    const fechaRegistro = document.getElementById('fecha_registro');
+    const proximaAplicacion = document.getElementById('proxima_aplicacion');
+
+    fechaRegistro.addEventListener('change', function() {
+        if (this.value) {
+            const fecha = new Date(this.value);
+            fecha.setMonth(fecha.getMonth() + 3);
+            const opciones = {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            };
+            proximaAplicacion.textContent = fecha.toLocaleDateString('es-ES', opciones);
+        }
+    });
+
+    // Seleccionar todos los animales
+    const seleccionarTodos = document.getElementById('seleccionar_todos');
+    const animalCheckboxes = document.querySelectorAll('.animal-checkbox');
+    const animalRows = document.querySelectorAll('.animal-row');
+
+    seleccionarTodos.addEventListener('change', function() {
+        animalCheckboxes.forEach((checkbox, index) => {
+            checkbox.checked = this.checked;
+            animalRows[index].classList.toggle('selected', this.checked);
+        });
+    });
+
+    // Resaltar filas seleccionadas
+    animalCheckboxes.forEach((checkbox, index) => {
+        checkbox.addEventListener('change', function() {
+            animalRows[index].classList.toggle('selected', this.checked);
+        });
+    });
+});
+
+// Función para ver detalles
+function verDetalles(id) {
+    // Mostrar un indicador de carga
+    document.getElementById('detallesContenido').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-warning" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando detalles...</p>
+        </div>
+    `;
+    
+    // Mostrar el modal inmediatamente con el indicador de carga
+    const detallesModal = new bootstrap.Modal(document.getElementById('detallesModal'));
+    detallesModal.show();
+    
+    fetch(`/vitaminizacion/detalles/${id}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            let contenidoHTML = `
+                <div class="table-responsive">
+                    <table class="table">
+                        <tr>
+                            <th style="width: 200px;"><i class="ri-calendar-line me-2"></i>Fecha de Registro:</th>
+                            <td>${data.fecha_registro}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="ri-medicine-bottle-line me-2"></i>Producto:</th>
+                            <td>${data.producto}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="ri-user-line me-2"></i>Aplicador:</th>
+                            <td>${data.aplicador}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="ri-calendar-check-line me-2"></i>Próxima Aplicación:</th>
+                            <td>${data.proxima_aplicacion}</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            
+            // Agregar la sección de animales tratados si existen
+            if (data.animales && data.animales.length > 0) {
+                contenidoHTML += `
+                <div class="mt-4">
+                    <h6 class="section-title">Animales Tratados</h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Número de Arete</th>
+                                    <th>Condición</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                // Crear las filas de la tabla de animales
+                data.animales.forEach(animal => {
+                    const identificacion = animal.numero_arete !== undefined ? animal.numero_arete : 'No disponible';
+                    const categoria = animal.condicion !== undefined ? animal.condicion : 'No disponible';
+                    
+                    contenidoHTML += `
+                    <tr>
+                        <td>${animal.id}</td>
+                        <td>${identificacion}</td>
+                        <td>${categoria}</td>
+                    </tr>
+                    `;
+                });
+                
+                contenidoHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                `;
+            }
+            
+            document.getElementById('detallesContenido').innerHTML = contenidoHTML;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('detallesContenido').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ri-error-warning-line me-2"></i>
+                    Error al cargar los detalles: ${error.message}
+                </div>
+            `;
+        });
+}
+
+// Función para confirmar eliminación
+function confirmarEliminar(id) {
+    // Configurar el formulario con la URL correcta
+    document.getElementById('formEliminar').action = `/eliminar_vitaminizacion/${id}`;
+    
+    // Mostrar el modal de confirmación
+    const eliminarModal = new bootstrap.Modal(document.getElementById('eliminarModal'));
+    eliminarModal.show();
+}
+</script>
+{% endblock %}

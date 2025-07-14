@@ -1,0 +1,949 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestión de Gestación e Inseminación{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/gestacion.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inseminacion.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="header-section">
+        <h2>Gestión de Gestación e Inseminación</h2>
+        <p class="text-muted">Administre el ciclo reproductivo de sus animales</p>
+    </div>
+    
+    <!-- Pestañas de navegación -->
+    <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="gestacion-tab" data-bs-toggle="tab" data-bs-target="#gestacion-content" type="button" role="tab">
+                <i class="fas fa-venus"></i> Gestación
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="inseminacion-tab" data-bs-toggle="tab" data-bs-target="#inseminacion-content" type="button" role="tab">
+                <i class="fas fa-syringe"></i> Inseminación
+            </button>
+        </li>
+    </ul>
+    
+    <!-- Contenido de las pestañas -->
+    <div class="tab-content" id="myTabContent">
+        <!-- Pestaña de Gestación -->
+        <div class="tab-pane fade show active" id="gestacion-content" role="tabpanel">
+            <!-- Resumen de gestaciones -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="stat-card bg-primary text-white">
+                        <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                        <div class="stat-info">
+                            <h3>{{ gestaciones|selectattr('estado', 'equalto', 'En Gestación')|list|length }}</h3>
+                            <p>Gestaciones Activas</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card bg-success text-white">
+                        <div class="stat-icon"><i class="fas fa-baby"></i></div>
+                        <div class="stat-info">
+                            <h3>{{ gestaciones|selectattr('estado', 'equalto', 'Finalizado')|list|length }}</h3>
+                            <p>Partos Exitosos</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card bg-danger text-white">
+                        <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="stat-info">
+                            <h3>{{ gestaciones|selectattr('estado', 'equalto', 'Abortado')|list|length }}</h3>
+                            <p>Gestaciones Abortadas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Formulario de registro de gestación -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><i class="fas fa-plus-circle me-2"></i>Registro de Gestación</h5>
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseForm" aria-expanded="true" aria-controls="collapseForm">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="collapse show" id="collapseForm">
+                    <div class="card-body">
+                        <form action="{{ url_for('registrar_gestacion_route') }}" method="POST" id="gestacionForm">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group mb-3">
+                                        <label for="animal_id" class="form-label"><i class="fas fa-cow me-1"></i>Animal</label>
+                                        <select class="form-select" id="animal_id" name="animal_id" required>
+                                            <option value="">Seleccione un animal</option>
+                                            {% for animal in animales %}
+                                            <option value="{{ animal.id }}">{{ animal.numero_arete }} - {{ animal.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="form-text text-muted">Seleccione la vaca o vacona para registrar gestación</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group mb-3">
+                                        <label for="fecha_monta" class="form-label"><i class="fas fa-calendar-alt me-1"></i>Fecha de Monta</label>
+                                        <input type="date" class="form-control" id="fecha_monta" name="fecha_monta" required>
+                                        <small class="form-text text-muted">Fecha en que ocurrió la monta o inseminación</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group mb-3">
+                                        <label for="observaciones" class="form-label"><i class="fas fa-clipboard me-1"></i>Observaciones</label>
+                                        <textarea class="form-control" id="observaciones" name="observaciones" rows="2" placeholder="Detalles adicionales sobre la gestación"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-end mt-3">
+                                <button type="reset" class="btn btn-outline-secondary me-2">
+                                    <i class="fas fa-undo me-1"></i>Limpiar
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Registrar Gestación
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de gestaciones -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Listado de Gestaciones</h5>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('generar_reporte_gestacion') }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-file-pdf me-1"></i>Generar Reporte PDF
+                            </a>
+                            <input type="text" class="form-control form-control-sm" id="searchGestacion" placeholder="Buscar animal..." style="width: 200px;">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if gestaciones|length > 0 %}
+                    <div class="table-responsive">
+                        <table class="table" id="tablaGestaciones">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-cow me-1"></i>Animal</th>
+                                    <th><i class="fas fa-calendar me-1"></i>Fecha Monta</th>
+                                    <th><i class="fas fa-calendar-day me-1"></i>Fecha Probable Parto</th>
+                                    <th><i class="fas fa-hourglass-half me-1"></i>Progreso</th>
+                                    <th><i class="fas fa-info-circle me-1"></i>Estado</th>
+                                    <th><i class="fas fa-clipboard-list me-1"></i>Observaciones</th>
+                                    <th><i class="fas fa-cog me-1"></i>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for g in gestaciones %}
+                                {% set estado = g.estado if g.estado is defined else g.get('estado') if g.get and g.get('estado') else 'Desconocido' %}
+                                {% set dias_restantes = g.dias_restantes if g.dias_restantes is defined else g.get('dias_restantes') if g.get and g.get('dias_restantes') else 0 %}
+                                <tr class="{% if estado == 'En Gestación' and dias_restantes <= 14 %}bg-light-warning{% endif %}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="animal-icon"><i class="fas fa-cow"></i></span>
+                                            <div>
+                                                {% set numero_arete = g.numero_arete if g.numero_arete is defined else g.get('numero_arete') if g.get and g.get('numero_arete') else 'N/A' %}
+                                                {% set nombre = g.nombre if g.nombre is defined else g.get('nombre') if g.get and g.get('nombre') else 'Sin nombre' %}
+                                                <strong>{{ numero_arete }}</strong><br>
+                                                <small class="text-muted">{{ nombre }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if g.fecha_inseminacion is defined and g.fecha_inseminacion is not none %}
+                                            {% if g.fecha_inseminacion is string %}
+                                                {{ g.fecha_inseminacion }}
+                                            {% else %}
+                                                {{ g.fecha_inseminacion.strftime('%d/%m/%Y') }}
+                                            {% endif %}
+                                        {% elif g.get and g.get('fecha_inseminacion') %}
+                                            {% if g.get('fecha_inseminacion') is string %}
+                                                {{ g.get('fecha_inseminacion') }}
+                                            {% else %}
+                                                {{ g.get('fecha_inseminacion').strftime('%d/%m/%Y') }}
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if g.fecha_probable_parto is defined and g.fecha_probable_parto is not none %}
+                                            {% if g.fecha_probable_parto is string %}
+                                                {{ g.fecha_probable_parto }}
+                                            {% else %}
+                                                {{ g.fecha_probable_parto.strftime('%d/%m/%Y') }}
+                                            {% endif %}
+                                        {% elif g.get and g.get('fecha_probable_parto') %}
+                                            {% if g.get('fecha_probable_parto') is string %}
+                                                {{ g.get('fecha_probable_parto') }}
+                                            {% else %}
+                                                {{ g.get('fecha_probable_parto').strftime('%d/%m/%Y') }}
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% set estado = g.estado if g.estado is defined else g.get('estado') if g.get and g.get('estado') else 'Desconocido' %}
+                                        {% if estado == 'En Gestación' %}
+                                            <div class="estado-gestacion">
+                                                <div class="indicador-dias">
+                                                    {% set dias_restantes = g.dias_restantes if g.dias_restantes is defined else g.get('dias_restantes') if g.get and g.get('dias_restantes') else 0 %}
+                                                    {% set porcentaje = ((283 - dias_restantes) / 283 * 100)|round|int %}
+                                                    <div class="progreso" style="width: {{ porcentaje }}%"></div>
+                                                </div>
+                                                <div class="dias-restantes">{{ dias_restantes }} días</div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% set estado = g.estado if g.estado is defined else g.get('estado') if g.get and g.get('estado') else 'Desconocido' %}
+                                        <span class="badge {% if estado == 'En Gestación' %}bg-primary{% elif estado == 'Finalizado' %}bg-success{% else %}bg-danger{% endif %}">
+                                            {{ estado }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% set observaciones = g.observaciones if g.observaciones is defined else g.get('observaciones') if g.get and g.get('observaciones') else '' %}
+                                        {% if observaciones %}
+                                            <span class="text-truncate d-inline-block" style="max-width: 150px;" data-bs-toggle="tooltip" title="{{ observaciones }}">
+                                                {{ observaciones }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">Sin observaciones</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% set estado = g.estado if g.estado is defined else g.get('estado') if g.get and g.get('estado') else 'Desconocido' %}
+                                        {% set id = g.id if g.id is defined else g.get('id') if g.get and g.get('id') else '' %}
+                                        {% if estado == 'En Gestación' %}
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-success" onclick="actualizarEstadoGestacion('{{ id }}', 'Finalizado')" data-bs-toggle="tooltip" title="Registrar parto exitoso">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="actualizarEstadoGestacion('{{ id }}', 'Abortado')" data-bs-toggle="tooltip" title="Registrar aborto">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="confirmarEliminarGestacion('{{ id }}')" data-bs-toggle="tooltip" title="Eliminar registro">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        {% else %}
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="confirmarEliminarGestacion('{{ id }}')" data-bs-toggle="tooltip" title="Eliminar registro">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> No hay gestaciones registradas actualmente.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Pestaña de Inseminación -->
+        <div class="tab-pane fade" id="inseminacion-content" role="tabpanel">
+            <!-- Resumen de inseminaciones -->
+            <div class="row mb-4 fade-in-up">
+                <div class="col-md-3">
+                    <div class="stat-card-inseminacion bg-total">
+                        <div class="stat-icon-inseminacion"><i class="fas fa-syringe"></i></div>
+                        <div class="stat-info-inseminacion">
+                            <h3>{{ inseminaciones|default([])|length }}</h3>
+                            <p>Total Inseminaciones</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card-inseminacion bg-artificial">
+                        <div class="stat-icon-inseminacion"><i class="fas fa-flask"></i></div>
+                        <div class="stat-info-inseminacion">
+                            <h3>{{ inseminaciones|default([])|selectattr('tipo', 'equalto', 'Artificial')|list|length }}</h3>
+                            <p>Inseminaciones Artificiales</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card-inseminacion bg-natural">
+                        <div class="stat-icon-inseminacion"><i class="fas fa-horse"></i></div>
+                        <div class="stat-info-inseminacion">
+                            <h3>{{ inseminaciones|default([])|selectattr('tipo', 'equalto', 'Natural')|list|length }}</h3>
+                            <p>Montas Naturales</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card-inseminacion bg-efectividad">
+                        <div class="stat-icon-inseminacion"><i class="fas fa-percentage"></i></div>
+                        <div class="stat-info-inseminacion">
+                            {% set total = inseminaciones|default([])|length %}
+                            {% set exitosas = gestaciones|default([])|length %}
+                            {% set porcentaje = (exitosas / total * 100)|round|int if total > 0 else 0 %}
+                            <h3>{{ porcentaje }}%</h3>
+                            <p>Efectividad</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Calendario de inseminaciones -->
+            <div class="calendar-container mb-4 fade-in-up">
+                <div class="calendar-header">
+                    <h5 class="calendar-title"><i class="fas fa-calendar-alt me-2"></i>Calendario de Inseminaciones</h5>
+                    <div class="calendar-navigation">
+                        <button class="calendar-nav-btn" id="prevMonth"><i class="fas fa-chevron-left"></i></button>
+                        <span class="mx-2" id="currentMonth">Abril 2025</span>
+                        <button class="calendar-nav-btn" id="nextMonth"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid">
+                    <!-- Los días del calendario se generarán con JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Formulario de registro de inseminación -->
+            <div class="card-inseminacion mb-4 fade-in-up">
+                <div class="card-header-inseminacion">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title-inseminacion"><i class="fas fa-plus-circle me-2"></i>Registro de Inseminación</h5>
+                        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFormIns" aria-expanded="true" aria-controls="collapseFormIns">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="collapse show" id="collapseFormIns">
+                    <div class="card-body-inseminacion">
+                        <form action="{{ url_for('registrar_inseminacion') }}" method="POST" id="inseminacionForm">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group-inseminacion">
+                                        <label for="animal_id_ins" class="form-label-inseminacion"><i class="fas fa-cow"></i>Animal</label>
+                                        <select class="form-select-inseminacion" id="animal_id_ins" name="animal_id" required>
+                                            <option value="">Seleccione un animal</option>
+                                            {% for animal in animales %}
+                                            <option value="{{ animal.id }}">{{ animal.numero_arete }} - {{ animal.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="form-text-inseminacion">Seleccione la hembra a inseminar</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group-inseminacion">
+                                        <label for="fecha_inseminacion" class="form-label-inseminacion"><i class="fas fa-calendar-alt"></i>Fecha</label>
+                                        <input type="date" class="form-control-inseminacion" id="fecha_inseminacion" name="fecha_inseminacion" required>
+                                        <small class="form-text-inseminacion">Fecha de la inseminación o monta</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group-inseminacion">
+                                        <label for="tipo_inseminacion" class="form-label-inseminacion"><i class="fas fa-tag"></i>Tipo</label>
+                                        <select class="form-select-inseminacion" id="tipo_inseminacion" name="tipo_inseminacion" required>
+                                            <option value="">Seleccione tipo</option>
+                                            <option value="Artificial">Artificial</option>
+                                            <option value="Natural">Natural</option>
+                                        </select>
+                                        <small class="form-text-inseminacion">Método utilizado</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group-inseminacion">
+                                        <label for="semental" class="form-label-inseminacion"><i class="fas fa-horse"></i>Semental/Pajuela</label>
+                                        <input type="text" class="form-control-inseminacion" id="semental" name="semental" required>
+                                        <small class="form-text-inseminacion">Identificación del semental o pajuela</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group-inseminacion">
+                                        <label for="observaciones_ins" class="form-label-inseminacion"><i class="fas fa-clipboard"></i>Observaciones</label>
+                                        <textarea class="form-control-inseminacion" id="observaciones_ins" name="observaciones" rows="2" placeholder="Detalles adicionales sobre la inseminación"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-end mt-4">
+                                <button type="reset" class="btn-inseminacion btn-outline-secondary-inseminacion me-2">
+                                    <i class="fas fa-undo"></i>Limpiar
+                                </button>
+                                <button type="submit" class="btn-inseminacion btn-primary-inseminacion">
+                                    <i class="fas fa-save"></i>Registrar Inseminación
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabla de inseminaciones -->
+            <div class="card-inseminacion fade-in-up">
+                <div class="card-header-inseminacion">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title-inseminacion"><i class="fas fa-list-alt me-2"></i>Inseminaciones Registradas</h5>
+                        <div class="search-container">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" class="form-control-inseminacion search-input" id="searchInseminacion" placeholder="Buscar animal...">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body-inseminacion">
+                    {% if inseminaciones|default([])|length > 0 %}
+                    <div class="table-responsive">
+                        <table class="table-inseminacion" id="tablaInseminaciones">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-cow me-1"></i>Animal</th>
+                                    <th><i class="fas fa-calendar me-1"></i>Fecha</th>
+                                    <th><i class="fas fa-tag me-1"></i>Tipo</th>
+                                    <th><i class="fas fa-horse me-1"></i>Semental/Pajuela</th>
+                                    <th><i class="fas fa-clipboard-list me-1"></i>Observaciones</th>
+                                    <th><i class="fas fa-cog me-1"></i>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in inseminaciones|default([]) %}
+                                {% set id = i.id if i.id is defined else i.get('id') if i.get and i.get('id') else '' %}
+                                {% set numero_arete = i.numero_arete if i.numero_arete is defined else i.get('numero_arete') if i.get and i.get('numero_arete') else 'N/A' %}
+                                {% set nombre = i.nombre if i.nombre is defined else i.get('nombre') if i.get and i.get('nombre') else 'Sin nombre' %}
+                                {% set tipo = i.tipo if i.tipo is defined else i.get('tipo') if i.get and i.get('tipo') else 'Desconocido' %}
+                                {% set semental = i.semental if i.semental is defined else i.get('semental') if i.get and i.get('semental') else 'No especificado' %}
+                                {% set observaciones = i.observaciones if i.observaciones is defined else i.get('observaciones') if i.get and i.get('observaciones') else '' %}
+                                {% set fecha_inseminacion = i.fecha_inseminacion if i.fecha_inseminacion is defined else i.get('fecha_inseminacion') if i.get and i.get('fecha_inseminacion') else None %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="animal-icon-inseminacion"><i class="fas fa-cow"></i></span>
+                                            <div>
+                                                <strong>{{ numero_arete }}</strong><br>
+                                                <small class="text-muted">{{ nombre }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if fecha_inseminacion is not none %}
+                                            {% if fecha_inseminacion is string %}
+                                                {{ fecha_inseminacion }}
+                                            {% else %}
+                                                {{ fecha_inseminacion.strftime('%d/%m/%Y') }}
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge-inseminacion {% if tipo == 'Artificial' %}badge-artificial{% else %}badge-natural{% endif %}">
+                                            {{ tipo }}
+                                        </span>
+                                    </td>
+                                    <td>{{ semental }}</td>
+                                    <td>
+                                        {% if observaciones %}
+                                            <span class="text-truncate d-inline-block" style="max-width: 150px;" data-bs-toggle="tooltip" title="{{ observaciones }}">
+                                                {{ observaciones }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">Sin observaciones</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex">
+                                            <button type="button" class="btn-action btn-primary" onclick="registrarGestacion('{{ id }}')" data-bs-toggle="tooltip" title="Registrar gestación">
+                                                <i class="fas fa-venus"></i>
+                                            </button>
+                                            <button type="button" class="btn-action btn-info text-white" data-bs-toggle="tooltip" title="Ver detalles">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button type="button" class="btn-action btn-warning text-white" data-bs-toggle="tooltip" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> No hay inseminaciones registradas actualmente.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para la funcionalidad de la página -->
+<script>
+// Inicializar tooltips de Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Inicializar filtros de búsqueda
+    document.getElementById('searchGestacion').addEventListener('keyup', function() {
+        filterTable('tablaGestaciones', this.value);
+    });
+    
+    if (document.getElementById('searchInseminacion')) {
+        document.getElementById('searchInseminacion').addEventListener('keyup', function() {
+            filterTable('tablaInseminaciones', this.value);
+        });
+    }
+    
+    // Establecer fecha actual en los campos de fecha si están vacíos
+    var today = new Date().toISOString().split('T')[0];
+    if (document.getElementById('fecha_monta') && !document.getElementById('fecha_monta').value) {
+        document.getElementById('fecha_monta').value = today;
+    }
+    if (document.getElementById('fecha_inseminacion') && !document.getElementById('fecha_inseminacion').value) {
+        document.getElementById('fecha_inseminacion').value = today;
+    }
+    
+    // Inicializar calendario de inseminaciones
+    if (document.getElementById('calendarGrid')) {
+        initCalendar();
+    }
+    
+    // Agregar listeners para los botones de navegación del calendario
+    if (document.getElementById('prevMonth')) {
+        document.getElementById('prevMonth').addEventListener('click', function() {
+            navigateCalendar(-1);
+        });
+    }
+    
+    if (document.getElementById('nextMonth')) {
+        document.getElementById('nextMonth').addEventListener('click', function() {
+            navigateCalendar(1);
+        });
+    }
+    
+    // Efectos de animación para las tarjetas de estadísticas
+    document.querySelectorAll('.stat-card-inseminacion').forEach(function(card, index) {
+        setTimeout(function() {
+            card.classList.add('fade-in-up');
+        }, index * 100);
+    });
+});
+
+// Variables globales para el calendario
+var currentDate = new Date();
+var inseminacionesData = []; // Aquí se cargarían las fechas de inseminaciones desde el servidor
+
+// Función para inicializar el calendario
+function initCalendar() {
+    // Obtener fechas de inseminaciones (simulado)
+    // En un caso real, estas fechas vendrían de la base de datos
+    inseminacionesData = [
+        new Date(2025, 3, 5),  // 5 de abril de 2025
+        new Date(2025, 3, 12), // 12 de abril de 2025
+        new Date(2025, 3, 18)  // 18 de abril de 2025
+    ];
+    
+    renderCalendar();
+}
+
+// Función para renderizar el calendario
+function renderCalendar() {
+    var year = currentDate.getFullYear();
+    var month = currentDate.getMonth();
+    
+    // Actualizar el encabezado del mes
+    var monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    document.getElementById('currentMonth').textContent = monthNames[month] + ' ' + year;
+    
+    // Obtener el primer día del mes
+    var firstDay = new Date(year, month, 1);
+    var startingDay = firstDay.getDay(); // 0 = Domingo, 1 = Lunes, ...
+    if (startingDay === 0) startingDay = 7; // Ajustar para que la semana comience en lunes
+    
+    // Obtener el número de días en el mes
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Obtener el contenedor del calendario
+    var calendarGrid = document.getElementById('calendarGrid');
+    calendarGrid.innerHTML = '';
+    
+    // Agregar encabezados de días
+    var daysOfWeek = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    for (var i = 0; i < 7; i++) {
+        var dayHeader = document.createElement('div');
+        dayHeader.className = 'calendar-day-header';
+        dayHeader.textContent = daysOfWeek[i];
+        calendarGrid.appendChild(dayHeader);
+    }
+    
+    // Agregar espacios en blanco para los días anteriores al primer día del mes
+    for (var i = 1; i < startingDay; i++) {
+        var emptyDay = document.createElement('div');
+        emptyDay.className = 'calendar-day other-month';
+        calendarGrid.appendChild(emptyDay);
+    }
+    
+    // Agregar los días del mes
+    for (var day = 1; day <= daysInMonth; day++) {
+        var dayElement = document.createElement('div');
+        dayElement.className = 'calendar-day';
+        dayElement.textContent = day;
+        
+        // Verificar si este día tiene alguna inseminación programada
+        var currentDateCheck = new Date(year, month, day);
+        var hasEvent = inseminacionesData.some(function(date) {
+            return date.getDate() === day && date.getMonth() === month && date.getFullYear() === year;
+        });
+        
+        if (hasEvent) {
+            dayElement.classList.add('has-event');
+            dayElement.setAttribute('data-bs-toggle', 'tooltip');
+            dayElement.setAttribute('title', 'Inseminación programada');
+        }
+        
+        // Marcar el día actual
+        var today = new Date();
+        if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+            dayElement.classList.add('active');
+        }
+        
+        // Agregar evento click para mostrar detalles
+        dayElement.addEventListener('click', function() {
+            var clickedDay = parseInt(this.textContent);
+            var clickedDate = new Date(year, month, clickedDay);
+            showDayDetails(clickedDate);
+        });
+        
+        calendarGrid.appendChild(dayElement);
+    }
+    
+    // Inicializar tooltips para los días con eventos
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('.calendar-day[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+// Función para navegar entre meses
+function navigateCalendar(direction) {
+    currentDate.setMonth(currentDate.getMonth() + direction);
+    renderCalendar();
+}
+
+// Función para mostrar detalles de un día
+function showDayDetails(date) {
+    var formattedDate = date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+    
+    // Verificar si hay inseminaciones en esta fecha
+    var hasEvent = inseminacionesData.some(function(eventDate) {
+        return eventDate.getDate() === date.getDate() && 
+               eventDate.getMonth() === date.getMonth() && 
+               eventDate.getFullYear() === date.getFullYear();
+    });
+    
+    if (hasEvent) {
+        Swal.fire({
+            title: 'Inseminaciones del ' + formattedDate,
+            html: '<div class="text-start"><p><strong>Animal:</strong> Vaca #1234 - Manchas</p>' +
+                  '<p><strong>Tipo:</strong> Artificial</p>' +
+                  '<p><strong>Semental:</strong> Pajuela A-567</p></div>',
+            icon: 'info',
+            confirmButtonText: 'Cerrar'
+        });
+    } else {
+        // Si no hay eventos, ofrecer registrar una nueva inseminación
+        Swal.fire({
+            title: formattedDate,
+            text: 'No hay inseminaciones programadas para esta fecha.',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Registrar inseminación',
+            cancelButtonText: 'Cerrar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Establecer la fecha en el formulario
+                var formattedDateInput = date.getFullYear() + '-' + 
+                                        String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                                        String(date.getDate()).padStart(2, '0');
+                document.getElementById('fecha_inseminacion').value = formattedDateInput;
+                
+                // Hacer scroll al formulario
+                document.getElementById('inseminacionForm').scrollIntoView({ behavior: 'smooth' });
+                
+                // Enfocar el campo de animal
+                document.getElementById('animal_id_ins').focus();
+            }
+        });
+    }
+}
+
+// Función para filtrar tablas
+function filterTable(tableId, query) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    
+    query = query.toLowerCase();
+    var rows = table.getElementsByTagName('tbody')[0].rows;
+    
+    for (var i = 0; i < rows.length; i++) {
+        var text = rows[i].textContent.toLowerCase();
+        rows[i].style.display = text.indexOf(query) > -1 ? '' : 'none';
+    }
+}
+
+// Función para actualizar estado de gestación
+function actualizarEstadoGestacion(gestacionId, nuevoEstado) {
+    // Mostrar confirmación antes de actualizar
+    var mensaje = nuevoEstado === 'Finalizado' ? 
+        '¿Confirmar que el parto ha finalizado exitosamente?' : 
+        '¿Confirmar que la gestación ha sido abortada?';
+    
+    var icono = nuevoEstado === 'Finalizado' ? 'success' : 'warning';
+    
+    Swal.fire({
+        title: 'Confirmar cambio de estado',
+        text: mensaje,
+        icon: icono,
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: nuevoEstado === 'Finalizado' ? '#28a745' : '#dc3545'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Proceder con la actualización
+            fetch('/actualizar_estado_gestacion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gestacion_id: gestacionId,
+                    estado: nuevoEstado
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Estado actualizado',
+                        text: data.message,
+                        icon: 'success'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error',
+                        text: data.message,
+                        icon: 'error'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Error al actualizar el estado',
+                    icon: 'error'
+                });
+            });
+        }
+    });
+}
+
+// Función para confirmar eliminación de gestación
+function confirmarEliminarGestacion(gestacionId) {
+    Swal.fire({
+        title: '¿Eliminar registro?',
+        text: '¿Está seguro de que desea eliminar este registro de gestación? Esta acción no se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            eliminarGestacion(gestacionId);
+        }
+    });
+}
+
+// Función para eliminar gestación
+function eliminarGestacion(gestacionId) {
+    fetch('/eliminar_gestacion', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            gestacion_id: gestacionId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                title: 'Eliminado',
+                text: data.message,
+                icon: 'success'
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                title: 'Error',
+                text: data.message,
+                icon: 'error'
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        Swal.fire({
+            title: 'Error',
+            text: 'Error al eliminar el registro de gestación',
+            icon: 'error'
+        });
+    });
+}
+
+// Función para registrar gestación desde inseminación
+function registrarGestacion(inseminacionId) {
+    Swal.fire({
+        title: 'Registrar gestación',
+        text: '¿Desea registrar una gestación a partir de esta inseminación?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, registrar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#3498db'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Aquí se implementaría la lógica para registrar la gestación
+            // Por ahora, solo mostraremos un mensaje
+            Swal.fire({
+                title: 'Funcionalidad en desarrollo',
+                text: 'Esta funcionalidad será implementada próximamente',
+                icon: 'info'
+            });
+            
+            // Cuando esté implementada, se podría hacer algo como:
+            /*
+            fetch('/registrar_gestacion_desde_inseminacion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    inseminacion_id: inseminacionId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Gestación registrada',
+                        text: data.message,
+                        icon: 'success'
+                    }).then(() => {
+                        // Cambiar a la pestaña de gestación
+                        document.getElementById('gestacion-tab').click();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error',
+                        text: data.message,
+                        icon: 'error'
+                    });
+                }
+            });
+            */
+        }
+    });
+}
+</script>
+
+<!-- Estilos adicionales inline -->
+<style>
+.stat-card {
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    margin-right: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.stat-info h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.stat-info p {
+    margin: 5px 0 0;
+    opacity: 0.8;
+}
+
+.animal-icon {
+    width: 40px;
+    height: 40px;
+    background-color: rgba(52, 152, 219, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    color: #3498db;
+}
+
+.bg-light-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.header-section {
+    margin-bottom: 30px;
+}
+
+.header-section h2 {
+    margin-bottom: 5px;
+}
+
+.header-section p {
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %}

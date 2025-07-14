@@ -1,0 +1,215 @@
+
+{% block extra_css %}
+<style>
+    .qr-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        text-align: center;
+    }
+    .qr-form {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
+    .qr-form input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+    .qr-form button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .qr-form button:hover {
+        background-color: #0056b3;
+    }
+    .qr-form .btn-back {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .qr-form .btn-back:hover {
+        background-color: #bd2130;
+    }
+    .qr-result {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f4f4f4;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .qr-image-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .qr-image {
+        max-width: 300px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        margin-bottom: 15px;
+    }
+    .print-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    .print-buttons button {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .print-buttons button:hover {
+        background-color: #218838;
+    }
+    .datos-qr {
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-top: 15px;
+        text-align: left;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printableArea, #printableArea * {
+            visibility: visible;
+        }
+        #printableArea {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    }
+    .animal-info {
+        flex: 1;
+        text-align: left;
+        padding-left: 20px;
+    }
+    .animal-info h3 {
+        color: #333;
+        margin-bottom: 15px;
+    }
+    .animal-info p {
+        margin: 5px 0;
+        color: #666;
+    }
+    .animal-info img {
+        max-width: 150px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+    .header-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 20px;
+    }
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/generar_qr.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="qr-container">
+    <div class="header-actions">
+        <a href="{{ url_for('animales') }}" class="btn btn-back">
+            <i class="fas fa-arrow-left"></i> Regresar
+        </a>
+    </div>
+    <div class="qr-form">
+        <h2>Generador de Código QR para Animales</h2>
+        <form method="POST">
+            <input type="text" name="identificador" placeholder="Ingresa número de arete, nombre o ID del animal" required>
+            <button type="submit" class="btn btn-primary">Generar Código QR</button>
+        </form>
+    </div>
+
+    {% if imagen_qr %}
+    <div class="qr-result" id="printableArea">
+        <div class="qr-image-container">
+            <h3>Código QR Generado</h3>
+            <img src="data:image/png;base64,{{ imagen_qr }}" alt="Código QR" class="qr-image">
+            <p>Escanea este código para ver la información del animal</p>
+            
+            <div class="print-buttons">
+                <button onclick="window.print()">Imprimir QR</button>
+                <button onclick="descargarQR()">Descargar QR</button>
+            </div>
+        </div>
+        
+        <div class="animal-info">
+            <h3>Información del Animal</h3>
+            <img src="{{ animal.foto_path }}" alt="{{ animal.nombre }}" class="animal-photo">
+            <p><strong>Finca:</strong> {{ animal.nombre_finca }}</p>
+            <p><strong>Propietario:</strong> {{ animal.nombre_propietario }}</p>
+            <p><strong>ID:</strong> {{ animal.id }}</p>
+            <p><strong>Número de Arete:</strong> {{ animal.numero_arete }}</p>
+            <p><strong>Nombre:</strong> {{ animal.nombre }}</p>
+            <p><strong>Sexo:</strong> {{ animal.sexo }}</p>
+            <p><strong>Raza:</strong> {{ animal.raza }}</p>
+            <p><strong>Condición:</strong> {{ animal.condicion }}</p>
+            <p><strong>Fecha de Nacimiento:</strong> {{ animal.fecha_nacimiento }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('.qr-form form');
+        form.addEventListener('submit', function(e) {
+            const identificador = form.querySelector('input[name="identificador"]').value.trim();
+            if (!identificador) {
+                e.preventDefault();
+                alert('Por favor, ingresa un identificador de animal');
+            }
+        });
+    });
+
+    function descargarQR() {
+        const imagenQR = document.querySelector('.qr-image');
+        const nombreArchivo = 'codigo_qr_animal.png';
+        
+        // Crear un enlace temporal
+        const enlaceDescarga = document.createElement('a');
+        enlaceDescarga.href = imagenQR.src;
+        enlaceDescarga.download = nombreArchivo;
+        
+        // Agregar al documento, hacer clic y eliminar
+        document.body.appendChild(enlaceDescarga);
+        enlaceDescarga.click();
+        document.body.removeChild(enlaceDescarga);
+    }
+</script>
+{% endblock %}

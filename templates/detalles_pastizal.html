@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-leaf"></i> Detalles del Pastizal: {{ pastizal.nombre }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Información del Pastizal -->
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2">Información General</h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">Dimensión:</th>
+                                    <td>{{ pastizal.dimension }} m²</td>
+                                </tr>
+                                <tr>
+                                    <th>Tipo de Hierba:</th>
+                                    <td>{{ pastizal.tipo_hierba }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Estado:</th>
+                                    <td>
+                                        {% if pastizal.estado == 'Disponible' %}
+                                            <span class="badge bg-success">{{ pastizal.estado }}</span>
+                                        {% elif pastizal.estado == 'En uso' %}
+                                            <span class="badge bg-primary">{{ pastizal.estado }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">{{ pastizal.estado }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Capacidad Máxima:</th>
+                                    <td>{{ pastizal.capacidad_maxima }} animales</td>
+                                </tr>
+                                <tr>
+                                    <th>Animales Actuales:</th>
+                                    <td>{{ pastizal.animales_actuales }} animales</td>
+                                </tr>
+                                {% if pastizal.fecha_ultimo_uso %}
+                                <tr>
+                                    <th>Último Uso:</th>
+                                    <td>{{ pastizal.fecha_ultimo_uso.strftime('%d/%m/%Y') }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if pastizal.fecha_disponible %}
+                                <tr>
+                                    <th>Disponible desde:</th>
+                                    <td>{{ pastizal.fecha_disponible.strftime('%d/%m/%Y') }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+
+                        <!-- Acciones -->
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2">Acciones</h6>
+                            <div class="d-grid gap-2">
+                                <!-- Editar Pastizal -->
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editarPastizalModal">
+                                    <i class="fas fa-edit"></i> Editar Pastizal
+                                </button>
+
+                                <!-- Cambiar Estado -->
+                                <button type="button" class="btn btn-info text-white" data-bs-toggle="modal" data-bs-target="#cambiarEstadoModal">
+                                    <i class="fas fa-sync-alt"></i> Cambiar Estado
+                                </button>
+
+                                {% if pastizal.animales_actuales > 0 %}
+                                <!-- Retirar Animales -->
+                                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#retirarAnimalesModal">
+                                    <i class="fas fa-sign-out-alt"></i> Retirar Animales
+                                </button>
+                                {% endif %}
+
+                                {% if pastizal.animales_actuales == 0 %}
+                                <!-- Eliminar Pastizal -->
+                                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#eliminarPastizalModal">
+                                    <i class="fas fa-trash"></i> Eliminar Pastizal
+                                </button>
+                                {% endif %}
+
+                                <!-- Volver -->
+                                <a href="{{ url_for('pastizales') }}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Volver a Pastizales
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Animales -->
+                    {% if animales %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2">Animales en el Pastizal</h6>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Arete</th>
+                                            <th>Nombre</th>
+                                            <th>Raza</th>
+                                            <th>Fecha de Ingreso</th>
+                                            <th>Días en el Pastizal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for animal in animales %}
+                                        <tr>
+                                            <td>{{ animal.numero_arete }}</td>
+                                            <td>{{ animal.nombre }}</td>
+                                            <td>{{ animal.raza }}</td>
+                                            <td>{{ animal.fecha_ingreso.strftime('%d/%m/%Y') }}</td>
+                                            <td>{{ (now - animal.fecha_ingreso).days }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Pastizal -->
+<div class="modal fade" id="editarPastizalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Pastizal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('editar_pastizal', pastizal_id=pastizal.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" value="{{ pastizal.nombre }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dimension" class="form-label">Dimensión (m²)</label>
+                        <input type="number" step="0.01" class="form-control" id="dimension" name="dimension" value="{{ pastizal.dimension }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo_hierba" class="form-label">Tipo de Hierba</label>
+                        <select class="form-select" id="tipo_hierba" name="tipo_hierba" required>
+                            <option value="Pasto Dallis" {% if pastizal.tipo_hierba == 'Pasto Dallis' %}selected{% endif %}>Pasto Dallis</option>
+                            <option value="Pasto Elefante" {% if pastizal.tipo_hierba == 'Pasto Elefante' %}selected{% endif %}>Pasto Elefante</option>
+                            <option value="Pasto Saboya" {% if pastizal.tipo_hierba == 'Pasto Saboya' %}selected{% endif %}>Pasto Saboya</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cambiar Estado -->
+<div class="modal fade" id="cambiarEstadoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cambiar Estado del Pastizal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('cambiar_estado_pastizal', pastizal_id=pastizal.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="estado" class="form-label">Nuevo Estado</label>
+                        <select class="form-select" id="estado" name="estado" required>
+                            <option value="Disponible" {% if pastizal.estado == 'Disponible' %}selected{% endif %}>Disponible</option>
+                            <option value="En uso" {% if pastizal.estado == 'En uso' %}selected{% endif %}>En uso</option>
+                            <option value="En regeneración" {% if pastizal.estado == 'En regeneración' %}selected{% endif %}>En regeneración</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Si selecciona "En regeneración", el pastizal no estará disponible por 30 días.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Cambiar Estado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Retirar Animales -->
+<div class="modal fade" id="retirarAnimalesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Retirar Animales del Pastizal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('retirar_animales', pastizal_id=pastizal.id) }}" method="POST">
+                <div class="modal-body">
+                    <p>¿Está seguro que desea retirar todos los animales de este pastizal?</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Esta acción pondrá el pastizal en estado de regeneración por 30 días.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Retirar Animales</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Pastizal -->
+<div class="modal fade" id="eliminarPastizalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Eliminar Pastizal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('eliminar_pastizal', pastizal_id=pastizal.id) }}" method="POST">
+                <div class="modal-body">
+                    <p>¿Está seguro que desea eliminar este pastizal?</p>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Esta acción no se puede deshacer.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar Pastizal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

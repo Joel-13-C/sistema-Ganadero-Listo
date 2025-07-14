@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header bg-warning text-white">
+            <h2><i class="fas fa-tools"></i> {{ titulo }}</h2>
+        </div>
+        <div class="card-body text-center">
+            <div class="mb-4">
+                <i class="fas fa-cogs" style="font-size: 5rem; color: #ffc107;"></i>
+            </div>
+            <h3>{{ mensaje }}</h3>
+            <p class="lead">Estamos trabajando para solucionar los problemas y mejorar la funcionalidad.</p>
+            <p>Por favor, intente acceder más tarde o contacte al administrador del sistema si necesita asistencia inmediata.</p>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary mt-3">
+                <i class="fas fa-home"></i> Volver al Inicio
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

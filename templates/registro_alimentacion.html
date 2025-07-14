@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Registro de Alimentación</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalRegistro">
+                <i class="fas fa-plus"></i> Nuevo Registro
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroFecha" class="form-label">Filtrar por Fecha</label>
+                    <input type="date" class="form-control" id="filtroFecha" onchange="filtrarRegistros()">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroAnimal" class="form-label">Filtrar por Animal</label>
+                    <select class="form-select" id="filtroAnimal" onchange="filtrarRegistros()">
+                        <option value="">Todos los animales</option>
+                        {% for animal in animales %}
+                            <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroPlan" class="form-label">Filtrar por Plan</label>
+                    <select class="form-select" id="filtroPlan" onchange="filtrarRegistros()">
+                        <option value="">Todos los planes</option>
+                        {% for plan in planes %}
+                            <option value="{{ plan.id }}">{{ plan.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Animal</th>
+                            <th>Plan de Alimentación</th>
+                            <th>Consumo Real</th>
+                            <th>Observaciones</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                        <tr>
+                            <td>{{ registro.fecha }}</td>
+                            <td>{{ registro.animal_nombre }}</td>
+                            <td>{{ registro.plan_nombre }}</td>
+                            <td>{{ registro.consumo_real }}</td>
+                            <td>{{ registro.observaciones }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editarRegistro({{ registro.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarRegistro({{ registro.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo registro -->
+<div class="modal fade" id="modalRegistro" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Registro de Alimentación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRegistro" method="POST" action="{{ url_for('agregar_registro_alimentacion') }}">
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="animal_id" class="form-label">Animal</label>
+                        <select class="form-select" id="animal_id" name="animal_id" required onchange="cargarPlanesAnimal()">
+                            <option value="">Seleccione un animal</option>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="plan_id" class="form-label">Plan de Alimentación</label>
+                        <select class="form-select" id="plan_id" name="plan_id" required>
+                            <option value="">Seleccione un plan</option>
+                            {% for plan in planes %}
+                                <option value="{{ plan.id }}">{{ plan.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="consumo_real" class="form-label">Consumo Real</label>
+                        <input type="number" step="0.01" class="form-control" id="consumo_real" name="consumo_real" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formRegistro" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function filtrarRegistros() {
+    const fecha = document.getElementById('filtroFecha').value;
+    const animal = document.getElementById('filtroAnimal').value;
+    const plan = document.getElementById('filtroPlan').value;
+    
+    window.location.href = `{{ url_for('registro_alimentacion') }}?fecha=${fecha}&animal=${animal}&plan=${plan}`;
+}
+
+function cargarPlanesAnimal() {
+    const animalId = document.getElementById('animal_id').value;
+    const planSelect = document.getElementById('plan_id');
+    
+    if (animalId) {
+        fetch(`/planes_por_animal/${animalId}`)
+            .then(response => response.json())
+            .then(data => {
+                planSelect.innerHTML = '<option value="">Seleccione un plan</option>';
+                data.forEach(plan => {
+                    planSelect.innerHTML += `<option value="${plan.id}">${plan.nombre}</option>`;
+                });
+            });
+    }
+}
+
+function editarRegistro(id) {
+    // Implementar lógica de edición
+}
+
+function eliminarRegistro(id) {
+    if (confirm('¿Está seguro de que desea eliminar este registro?')) {
+        fetch(`/eliminar_registro_alimentacion/${id}`, {
+            method: 'DELETE',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al eliminar el registro');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

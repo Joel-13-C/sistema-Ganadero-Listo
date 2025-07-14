@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block titulo %}Generación de Reportes PDF{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-3">Generación de Reportes PDF</h1>
+            <p class="text-muted">Seleccione el tipo de reporte que desea generar y configure los parámetros necesarios.</p>
+        </div>
+    </div>
+
+    {% if mensaje %}
+    <div class="alert alert-{{ tipo_mensaje }} alert-dismissible fade show" role="alert">
+        {{ mensaje }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Reporte de Animales</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Genere un reporte detallado del inventario de animales, incluyendo información sobre categorías, razas, pesos y valores.</p>
+                    <form action="{{ url_for('generar_reporte_animales_route') }}" method="post">
+                        
+                        <div class="mb-3">
+                            <label for="categoria_animal" class="form-label">Categoría</label>
+                            <select class="form-select" id="categoria_animal" name="categoria_animal">
+                                <option value="todas">Todas las categorías</option>
+                                {% for categoria in categorias_animales %}
+                                <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="estado_animal" class="form-label">Estado</label>
+                            <select class="form-select" id="estado_animal" name="estado_animal">
+                                <option value="todos">Todos los estados</option>
+                                <option value="Activo">Activo</option>
+                                <option value="Vendido">Vendido</option>
+                                <option value="Fallecido">Fallecido</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">Generar Reporte</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">Reporte Financiero</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Genere un reporte financiero con detalles de ingresos y gastos, categorías y balance general.</p>
+                    <form action="{{ url_for('generar_reporte_financiero_route') }}" method="post">
+                        
+                        <div class="mb-3">
+                            <label for="periodo_financiero" class="form-label">Período</label>
+                            <select class="form-select" id="periodo_financiero" name="periodo_financiero">
+                                <option value="mes_actual">Mes actual</option>
+                                <option value="mes_anterior">Mes anterior</option>
+                                <option value="anio_actual">Año actual</option>
+                                <option value="personalizado">Personalizado</option>
+                            </select>
+                        </div>
+                        
+                        <div id="fechas_personalizadas" class="d-none">
+                            <div class="mb-3">
+                                <label for="fecha_inicio" class="form-label">Fecha inicio</label>
+                                <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio">
+                            </div>
+                            <div class="mb-3">
+                                <label for="fecha_fin" class="form-label">Fecha fin</label>
+                                <input type="date" class="form-control" id="fecha_fin" name="fecha_fin">
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success w-100">Generar Reporte</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Reporte de Salud</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Genere un reporte de eventos de salud, vacunaciones y tratamientos realizados.</p>
+                    <form action="{{ url_for('generar_reporte_salud_route') }}" method="post">
+                        
+                        <div class="mb-3">
+                            <label for="periodo_salud" class="form-label">Período</label>
+                            <select class="form-select" id="periodo_salud" name="periodo_salud">
+                                <option value="mes_actual">Mes actual</option>
+                                <option value="mes_anterior">Mes anterior</option>
+                                <option value="anio_actual">Año actual</option>
+                                <option value="personalizado">Personalizado</option>
+                            </select>
+                        </div>
+                        
+                        <div id="fechas_personalizadas_salud" class="d-none">
+                            <div class="mb-3">
+                                <label for="fecha_inicio_salud" class="form-label">Fecha inicio</label>
+                                <input type="date" class="form-control" id="fecha_inicio_salud" name="fecha_inicio">
+                            </div>
+                            <div class="mb-3">
+                                <label for="fecha_fin_salud" class="form-label">Fecha fin</label>
+                                <input type="date" class="form-control" id="fecha_fin_salud" name="fecha_fin">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="tipo_evento" class="form-label">Tipo de evento</label>
+                            <select class="form-select" id="tipo_evento" name="tipo_evento">
+                                <option value="todos">Todos los eventos</option>
+                                <option value="Vacunación">Vacunación</option>
+                                <option value="Tratamiento">Tratamiento</option>
+                                <option value="Enfermedad">Enfermedad</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-info w-100">Generar Reporte</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">Reporte de Producción</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Genere un reporte detallado de la producción de leche por animal y por período.</p>
+                    <form action="{{ url_for('generar_reporte_produccion_route') }}" method="post">
+                        
+                        <div class="mb-3">
+                            <label for="periodo_produccion" class="form-label">Período</label>
+                            <select class="form-select" id="periodo_produccion" name="periodo_produccion">
+                                <option value="mes_actual">Mes actual</option>
+                                <option value="mes_anterior">Mes anterior</option>
+                                <option value="anio_actual">Año actual</option>
+                                <option value="personalizado">Personalizado</option>
+                            </select>
+                        </div>
+                        
+                        <div id="fechas_personalizadas_produccion" class="d-none">
+                            <div class="mb-3">
+                                <label for="fecha_inicio_produccion" class="form-label">Fecha inicio</label>
+                                <input type="date" class="form-control" id="fecha_inicio_produccion" name="fecha_inicio">
+                            </div>
+                            <div class="mb-3">
+                                <label for="fecha_fin_produccion" class="form-label">Fecha fin</label>
+                                <input type="date" class="form-control" id="fecha_fin_produccion" name="fecha_fin">
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-warning w-100">Generar Reporte</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar/ocultar fechas personalizadas para reporte financiero
+    const periodoFinanciero = document.getElementById('periodo_financiero');
+    const fechasPersonalizadas = document.getElementById('fechas_personalizadas');
+    
+    periodoFinanciero.addEventListener('change', function() {
+        if (this.value === 'personalizado') {
+            fechasPersonalizadas.classList.remove('d-none');
+        } else {
+            fechasPersonalizadas.classList.add('d-none');
+        }
+    });
+    
+    // Mostrar/ocultar fechas personalizadas para reporte de salud
+    const periodoSalud = document.getElementById('periodo_salud');
+    const fechasPersonalizadasSalud = document.getElementById('fechas_personalizadas_salud');
+    
+    periodoSalud.addEventListener('change', function() {
+        if (this.value === 'personalizado') {
+            fechasPersonalizadasSalud.classList.remove('d-none');
+        } else {
+            fechasPersonalizadasSalud.classList.add('d-none');
+        }
+    });
+    
+    // Mostrar/ocultar fechas personalizadas para reporte de producción
+    const periodoProduccion = document.getElementById('periodo_produccion');
+    const fechasPersonalizadasProduccion = document.getElementById('fechas_personalizadas_produccion');
+    
+    periodoProduccion.addEventListener('change', function() {
+        if (this.value === 'personalizado') {
+            fechasPersonalizadasProduccion.classList.remove('d-none');
+        } else {
+            fechasPersonalizadasProduccion.classList.add('d-none');
+        }
+    });
+});
+</script>
+{% endblock %}

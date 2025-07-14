@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Gestión de Tareas</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAgregarTarea">
+                <i class="fas fa-plus"></i> Agregar Tarea
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Filtros -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form id="formFiltros" class="row g-3">
+                <div class="col-md-3">
+                    <label for="empleado" class="form-label">Empleado</label>
+                    <select class="form-select" id="empleado" name="empleado">
+                        <option value="">Todos</option>
+                        {% for empleado in empleados %}
+                            <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select class="form-select" id="estado" name="estado">
+                        <option value="">Todos</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En Progreso">En Progreso</option>
+                        <option value="Completada">Completada</option>
+                        <option value="Cancelada">Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="prioridad" class="form-label">Prioridad</label>
+                    <select class="form-select" id="prioridad" name="prioridad">
+                        <option value="">Todas</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Media">Media</option>
+                        <option value="Baja">Baja</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Tareas -->
+    <div class="row">
+        <!-- Tareas Pendientes -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="card-title mb-0">Pendientes</h5>
+                </div>
+                <div class="card-body">
+                    {% for tarea in tareas if tarea.estado == 'Pendiente' %}
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ tarea.titulo }}</h6>
+                            <p class="card-text">{{ tarea.descripcion }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-{{ tarea.prioridad|lower }}">{{ tarea.prioridad }}</span>
+                                <small>Asignado a: {{ tarea.empleado_nombre }}</small>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-success" onclick="actualizarEstado({{ tarea.id }}, 'En Progreso')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="editarTarea({{ tarea.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarTarea({{ tarea.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tareas En Progreso -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">En Progreso</h5>
+                </div>
+                <div class="card-body">
+                    {% for tarea in tareas if tarea.estado == 'En Progreso' %}
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ tarea.titulo }}</h6>
+                            <p class="card-text">{{ tarea.descripcion }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-{{ tarea.prioridad|lower }}">{{ tarea.prioridad }}</span>
+                                <small>Asignado a: {{ tarea.empleado_nombre }}</small>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-success" onclick="actualizarEstado({{ tarea.id }}, 'Completada')">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="editarTarea({{ tarea.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarTarea({{ tarea.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tareas Completadas -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">Completadas</h5>
+                </div>
+                <div class="card-body">
+                    {% for tarea in tareas if tarea.estado == 'Completada' %}
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ tarea.titulo }}</h6>
+                            <p class="card-text">{{ tarea.descripcion }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-{{ tarea.prioridad|lower }}">{{ tarea.prioridad }}</span>
+                                <small>Asignado a: {{ tarea.empleado_nombre }}</small>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-warning" onclick="editarTarea({{ tarea.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarTarea({{ tarea.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar/Editar Tarea -->
+<div class="modal fade" id="modalAgregarTarea" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agregar Tarea</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formTarea" action="{{ url_for('agregar_tarea') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="titulo" class="form-label">Título</label>
+                        <input type="text" class="form-control" id="titulo" name="titulo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="empleado_id" class="form-label">Asignar a</label>
+                        <select class="form-select" id="empleado_id" name="empleado_id" required>
+                            <option value="">Seleccione un empleado</option>
+                            {% for empleado in empleados %}
+                                <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha_limite" class="form-label">Fecha Límite</label>
+                        <input type="date" class="form-control" id="fecha_limite" name="fecha_limite" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="prioridad" class="form-label">Prioridad</label>
+                        <select class="form-select" id="prioridad" name="prioridad" required>
+                            <option value="Alta">Alta</option>
+                            <option value="Media">Media</option>
+                            <option value="Baja">Baja</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formTarea" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function actualizarEstado(id, nuevoEstado) {
+    fetch(`/tareas/actualizar_estado/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ estado: nuevoEstado })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error al actualizar el estado: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al actualizar el estado');
+    });
+}
+
+function editarTarea(id) {
+    // Implementar edición
+}
+
+function eliminarTarea(id) {
+    if (confirm('¿Está seguro de que desea eliminar esta tarea?')) {
+        fetch(`/tareas/eliminar/${id}`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al eliminar la tarea: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar la tarea');
+        });
+    }
+}
+
+// Inicializar fecha límite por defecto
+document.addEventListener('DOMContentLoaded', function() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('fecha_limite').valueAsDate = tomorrow;
+});
+</script>
+{% endblock %}

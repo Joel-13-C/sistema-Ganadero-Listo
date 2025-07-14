@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Gestión de Equipos</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalEquipo">
+                <i class="fas fa-plus"></i> Nuevo Equipo
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Equipos</h5>
+                    <h3 class="card-text">{{ total_equipos }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Equipos Activos</h5>
+                    <h3 class="card-text">{{ equipos_activos }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">En Mantenimiento</h5>
+                    <h3 class="card-text">{{ equipos_mantenimiento }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroEstado" class="form-label">Filtrar por Estado</label>
+                    <select class="form-select" id="filtroEstado" onchange="filtrarEquipos()">
+                        <option value="">Todos los estados</option>
+                        <option value="Activo">Activo</option>
+                        <option value="En Mantenimiento">En Mantenimiento</option>
+                        <option value="Fuera de Servicio">Fuera de Servicio</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroUbicacion" class="form-label">Filtrar por Ubicación</label>
+                    <input type="text" class="form-control" id="filtroUbicacion" onkeyup="filtrarEquipos()">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Modelo</th>
+                            <th>Serie</th>
+                            <th>Fecha Adquisición</th>
+                            <th>Estado</th>
+                            <th>Ubicación</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for equipo in equipos %}
+                        <tr>
+                            <td>{{ equipo.nombre }}</td>
+                            <td>{{ equipo.modelo }}</td>
+                            <td>{{ equipo.serie }}</td>
+                            <td>{{ equipo.fecha_adquisicion }}</td>
+                            <td>
+                                <span class="badge {% if equipo.estado == 'Activo' %}bg-success{% elif equipo.estado == 'En Mantenimiento' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ equipo.estado }}
+                                </span>
+                            </td>
+                            <td>{{ equipo.ubicacion }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="verDetalles({{ equipo.id }})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="editarEquipo({{ equipo.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarEquipo({{ equipo.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo equipo -->
+<div class="modal fade" id="modalEquipo" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Equipo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEquipo" method="POST" action="{{ url_for('agregar_equipo') }}">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo" class="form-label">Tipo de Equipo</label>
+                        <select class="form-select" id="tipo" name="tipo" required>
+                            <option value="">Seleccione un tipo</option>
+                            <option value="Maquinaria">Maquinaria</option>
+                            <option value="Herramienta">Herramienta</option>
+                            <option value="Vehículo">Vehículo</option>
+                            <option value="Equipo Médico">Equipo Médico</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="marca" class="form-label">Marca</label>
+                        <input type="text" class="form-control" id="marca" name="marca">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelo" class="form-label">Modelo</label>
+                        <input type="text" class="form-control" id="modelo" name="modelo">
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha_adquisicion" class="form-label">Fecha de Adquisición</label>
+                        <input type="date" class="form-control" id="fecha_adquisicion" name="fecha_adquisicion" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="costo" class="form-label">Costo</label>
+                        <input type="number" class="form-control" id="costo" name="costo" step="0.01" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="estado" class="form-label">Estado</label>
+                        <select class="form-select" id="estado" name="estado" required>
+                            <option value="Activo">Activo</option>
+                            <option value="En Mantenimiento">En Mantenimiento</option>
+                            <option value="Fuera de Servicio">Fuera de Servicio</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ubicacion" class="form-label">Ubicación</label>
+                        <input type="text" class="form-control" id="ubicacion" name="ubicacion">
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formEquipo" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para ver detalles -->
+<div class="modal fade" id="modalDetalles" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalles del Equipo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesEquipoContenido">
+                <!-- El contenido se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function filtrarEquipos() {
+    const estado = document.getElementById('filtroEstado').value;
+    const ubicacion = document.getElementById('filtroUbicacion').value;
+    
+    window.location.href = `{{ url_for('equipos') }}?estado=${estado}&ubicacion=${ubicacion}`;
+}
+
+function verDetalles(id) {
+    fetch(`/detalles_equipo/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            const contenido = document.getElementById('detallesEquipoContenido');
+            contenido.innerHTML = `
+                <p><strong>Nombre:</strong> ${data.nombre}</p>
+                <p><strong>Modelo:</strong> ${data.modelo}</p>
+                <p><strong>Serie:</strong> ${data.serie}</p>
+                <p><strong>Fecha de Adquisición:</strong> ${data.fecha_adquisicion}</p>
+                <p><strong>Estado:</strong> ${data.estado}</p>
+                <p><strong>Ubicación:</strong> ${data.ubicacion}</p>
+                <p><strong>Descripción:</strong> ${data.descripcion}</p>
+                
+                <h6 class="mt-4">Historial de Mantenimientos</h6>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.mantenimientos.map(m => `
+                            <tr>
+                                <td>${m.fecha_programada}</td>
+                                <td>${m.tipo}</td>
+                                <td>${m.estado}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+        });
+}
+
+function editarEquipo(id) {
+    // Implementar lógica de edición
+}
+
+function eliminarEquipo(id) {
+    if (confirm('¿Está seguro de que desea eliminar este equipo?')) {
+        fetch(`/eliminar_equipo/${id}`, {
+            method: 'DELETE',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al eliminar el equipo');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

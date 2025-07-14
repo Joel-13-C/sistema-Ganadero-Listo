@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Historial de Actividades del Sistema</h2>
+            <p class="text-muted">Registro de auditoría de todas las acciones realizadas en el sistema</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="tabla-auditoria">
+                    <thead>
+                        <tr>
+                            <th>Fecha y Hora</th>
+                            <th>Usuario</th>
+                            <th>Módulo</th>
+                            <th>Acción</th>
+                            <th>Descripción</th>
+                            <th>Dirección IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if actividades %}
+                            {% for actividad in actividades %}
+                            <tr>
+                                <td>{{ actividad.fecha_hora.strftime('%d/%m/%Y %H:%M:%S') if actividad.fecha_hora else 'N/A' }}</td>
+                                <td>{{ actividad.usuario_nombre or 'Usuario no identificado' }}</td>
+                                <td>{{ actividad.modulo }}</td>
+                                <td>{{ actividad.accion }}</td>
+                                <td>{{ actividad.descripcion or '-' }}</td>
+                                <td>{{ actividad.ip or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">No hay registros de actividad disponibles</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Inicializar DataTable para facilitar la búsqueda y paginación
+        $('#tabla-auditoria').DataTable({
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json"
+            },
+            "order": [[0, "desc"]], // Ordenar por fecha descendente
+            "pageLength": 25
+        });
+    });
+</script>
+{% endblock %}

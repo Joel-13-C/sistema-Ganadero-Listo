@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .cambiar-contrasena-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 30px;
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .password-strength-meter {
+        height: 5px;
+        background-color: #e0e0e0;
+        margin-top: 5px;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .password-strength-meter div {
+        height: 100%;
+        width: 0;
+        transition: width 0.5s;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="cambiar-contrasena-container">
+        <h2 class="text-center mb-4">Cambiar Contraseña</h2>
+        
+        <form action="{{ url_for('cambiar_contrasena') }}" method="POST" id="cambiar-contrasena-form">
+            <div class="form-group mb-3">
+                <label for="contrasena_actual">Contraseña Actual</label>
+                <input type="password" class="form-control" id="contrasena_actual" 
+                       name="contrasena_actual" required>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label for="nueva_contrasena">Nueva Contraseña</label>
+                <input type="password" class="form-control" id="nueva_contrasena" 
+                       name="nueva_contrasena" required minlength="8">
+                <div class="password-strength-meter">
+                    <div id="password-strength"></div>
+                </div>
+                <small class="form-text">
+                    La contraseña debe cumplir con los siguientes requisitos:
+                    <ul class="mt-1">
+                        <li id="req-longitud" class="text-muted">Al menos 8 caracteres</li>
+                        <li id="req-mayuscula" class="text-muted">Al menos una letra mayúscula</li>
+                        <li id="req-minuscula" class="text-muted">Al menos una letra minúscula</li>
+                        <li id="req-numero" class="text-muted">Al menos un número</li>
+                    </ul>
+                </small>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label for="confirmar_contrasena">Confirmar Nueva Contraseña</label>
+                <input type="password" class="form-control" id="confirmar_contrasena" 
+                       name="confirmar_contrasena" required>
+                <div id="password-match-error" class="text-danger" style="display: none;">
+                    Las contraseñas no coinciden
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary" id="btn-cambiar-contrasena">
+                    Cambiar Contraseña
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary ml-2">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const nuevaContrasena = document.getElementById('nueva_contrasena');
+        const confirmarContrasena = document.getElementById('confirmar_contrasena');
+        const passwordStrength = document.getElementById('password-strength');
+        const passwordMatchError = document.getElementById('password-match-error');
+        const btnCambiarContrasena = document.getElementById('btn-cambiar-contrasena');
+
+        function evaluarFuerzaContrasena(contrasena) {
+            let strength = 0;
+            
+            // Requisitos mínimos (los mismos que en el backend)
+            const tieneLongitudMinima = contrasena.length >= 8;
+            const tieneMayuscula = /[A-Z]/.test(contrasena);
+            const tieneMinuscula = /[a-z]/.test(contrasena);
+            const tieneNumero = /[0-9]/.test(contrasena);
+            const tieneCaracterEspecial = /[^A-Za-z0-9]/.test(contrasena);
+            
+            // Calcular puntuación
+            if (tieneLongitudMinima) strength++;
+            if (tieneMayuscula) strength++;
+            if (tieneMinuscula) strength++;
+            if (tieneNumero) strength++;
+            if (tieneCaracterEspecial) strength++;
+            
+            // Actualizar los indicadores visuales de requisitos
+            actualizarIndicadoresRequisitos(tieneLongitudMinima, tieneMayuscula, tieneMinuscula, tieneNumero);
+            
+            return strength;
+        }
+        
+        function actualizarIndicadoresRequisitos(longitud, mayuscula, minuscula, numero) {
+            // Actualizar los indicadores visuales si existen
+            const requisitos = [
+                { id: 'req-longitud', cumplido: longitud },
+                { id: 'req-mayuscula', cumplido: mayuscula },
+                { id: 'req-minuscula', cumplido: minuscula },
+                { id: 'req-numero', cumplido: numero }
+            ];
+            
+            requisitos.forEach(req => {
+                const elemento = document.getElementById(req.id);
+                if (elemento) {
+                    if (req.cumplido) {
+                        elemento.classList.add('text-success');
+                        elemento.classList.remove('text-muted');
+                    } else {
+                        elemento.classList.remove('text-success');
+                        elemento.classList.add('text-muted');
+                    }
+                }
+            });
+        }
+
+        function actualizarMedidorFuerza() {
+            const contrasena = nuevaContrasena.value;
+            const fuerza = evaluarFuerzaContrasena(contrasena);
+            
+            passwordStrength.style.width = `${fuerza * 20}%`;
+            
+            switch(fuerza) {
+                case 0:
+                case 1:
+                    passwordStrength.style.backgroundColor = 'red';
+                    break;
+                case 2:
+                case 3:
+                    passwordStrength.style.backgroundColor = 'orange';
+                    break;
+                case 4:
+                case 5:
+                    passwordStrength.style.backgroundColor = 'green';
+                    break;
+            }
+        }
+
+        function validarContrasenas() {
+            const contrasena = nuevaContrasena.value;
+            const confirmacion = confirmarContrasena.value;
+            const contrasenaActual = document.getElementById('contrasena_actual').value;
+            
+            // Verificar que las contraseñas coincidan
+            const coinciden = contrasena === confirmacion;
+            
+            // Verificar requisitos mínimos
+            const tieneLongitudMinima = contrasena.length >= 8;
+            const tieneMayuscula = /[A-Z]/.test(contrasena);
+            const tieneMinuscula = /[a-z]/.test(contrasena);
+            const tieneNumero = /[0-9]/.test(contrasena);
+            
+            // Verificar que la nueva contraseña no sea igual a la actual
+            const esDistintaActual = contrasena !== contrasenaActual || contrasenaActual === '';
+            
+            // Mostrar error si las contraseñas no coinciden
+            if (!coinciden && confirmacion !== '') {
+                passwordMatchError.style.display = 'block';
+            } else {
+                passwordMatchError.style.display = 'none';
+            }
+            
+            // Habilitar o deshabilitar el botón según las validaciones
+            const cumpleRequisitos = tieneLongitudMinima && tieneMayuscula && tieneMinuscula && tieneNumero;
+            btnCambiarContrasena.disabled = !coinciden || !cumpleRequisitos || !esDistintaActual || contrasena === '' || confirmacion === '' || contrasenaActual === '';
+        }
+
+        // Agregar listeners para todos los campos
+        nuevaContrasena.addEventListener('input', function() {
+            actualizarMedidorFuerza();
+            validarContrasenas();
+        });
+
+        confirmarContrasena.addEventListener('input', validarContrasenas);
+        document.getElementById('contrasena_actual').addEventListener('input', validarContrasenas);
+        
+        // Inicializar validación
+        actualizarMedidorFuerza();
+        validarContrasenas();
+    });
+</script>
+{% endblock %}

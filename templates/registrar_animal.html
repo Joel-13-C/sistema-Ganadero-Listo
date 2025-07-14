@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/registrar_animal.css') }}">
+<style>
+    .preview-image {
+        max-height: 300px;
+        min-height: 300px;
+        object-fit: cover;
+        border-radius: 15px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container registro-animal-container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card registro-animal-card">
+                <div class="card-header bg-gradient text-white">
+                    <h2 class="mb-0">
+                        <i class="fas fa-cow me-3"></i>Registrar Nuevo Animal
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form id="registroAnimalForm" action="{{ url_for('registrar_animal') }}" method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-lg-4">
+                                <div class="animal-photo-upload mb-4">
+                                    <input type="file" name="foto" id="fotoInput" class="form-control d-none" accept="image/*">
+                                    <label for="fotoInput" class="photo-upload-label">
+                                        <img id="previewImage" 
+                                             src="/static/images/upload-image-placeholder.svg" 
+                                             class="img-fluid preview-image" 
+                                             alt="Vista previa de la foto"
+                                             onerror="this.src='/static/images/upload-image-placeholder.svg'">
+                                        <div class="photo-upload-overlay">
+                                            <i class="fas fa-camera"></i>
+                                            <span>Subir Foto</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="nombre" class="form-label">Nombre del Animal</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                                            <input type="text" class="form-control" id="nombre" name="nombre" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="numero_arete" class="form-label">Número de Arete</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-id-badge"></i></span>
+                                            <input type="text" class="form-control" id="numero_arete" name="numero_arete" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="raza" class="form-label">Raza</label>
+                                        <select class="form-select" id="raza" name="raza" required>
+                                            <option value="">Seleccionar Raza</option>
+                                            <option value="Holstein">Holstein</option>
+                                            <option value="Angus">Angus</option>
+                                            <option value="Hereford">Hereford</option>
+                                            <option value="Jersey">Jersey</option>
+                                            <option value="Otra">Otra</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="sexo" class="form-label">Sexo</label>
+                                        <select class="form-select" id="sexo" name="sexo" required>
+                                            <option value="">Seleccionar Sexo</option>
+                                            <option value="Macho">Macho</option>
+                                            <option value="Hembra">Hembra</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                                            <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="condicion" class="form-label">Condición</label>
+                                        <select class="form-select" id="condicion" name="condicion" required>
+                                            <option value="">Seleccionar</option>
+                                            <option value="Toro">Toro</option>
+                                            <option value="Torete">Torete</option>
+                                            <option value="Vaca">Vaca</option>
+                                            <option value="Vacona">Vacona</option>
+                                            <option value="Ternero">Ternero</option>
+                                            <option value="Ternera">Ternera</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="propietario" class="form-label">Propietario</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                            <input type="text" class="form-control" id="propietario" name="propietario" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="padre_arete" class="form-label">Arete del Padre (Opcional)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-male"></i></span>
+                                            <input type="text" class="form-control" id="padre_arete" name="padre_arete">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12 mb-3">
+                                        <label for="madre_arete" class="form-label">Arete de la Madre (Opcional)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-female"></i></span>
+                                            <input type="text" class="form-control" id="madre_arete" name="madre_arete">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-save me-2"></i>Registrar Animal
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fotoInput = document.getElementById('fotoInput');
+    const previewImage = document.getElementById('previewImage');
+
+    fotoInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    const form = document.getElementById('registroAnimalForm');
+    form.addEventListener('submit', function(event) {
+        const requiredFields = form.querySelectorAll('[required]');
+        let isValid = true;
+
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                isValid = false;
+                field.classList.add('is-invalid');
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        });
+
+        if (!isValid) {
+            event.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Campos Incompletos',
+                text: 'Por favor, complete todos los campos requeridos',
+                confirmButtonText: 'Entendido'
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

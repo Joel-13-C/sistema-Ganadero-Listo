@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .perfil-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background-color: #ffffff;
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .perfil-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .perfil-header h2 {
+        color: #2c3e50;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .perfil-header p {
+        color: #6c757d;
+        font-size: 1rem;
+    }
+    
+    .perfil-avatar {
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 5px solid #ffffff;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        transition: all 0.3s ease;
+    }
+    
+    .perfil-avatar:hover {
+        transform: scale(1.05);
+    }
+    
+    .upload-avatar-btn {
+        position: relative;
+        overflow: hidden;
+        margin: 1rem 0;
+        transition: all 0.3s ease;
+        background-color: #28a745;
+        border: none;
+    }
+    
+    .upload-avatar-btn:hover {
+        background-color: #218838;
+        transform: translateY(-2px);
+    }
+    
+    .upload-avatar-btn input[type="file"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+    
+    .avatar-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+    }
+    
+    .avatar-info {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-align: center;
+    }
+    
+    .form-section {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-section-title {
+        font-size: 1.2rem;
+        color: #2c3e50;
+        margin-bottom: 1.2rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control {
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .btn-actions {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        background-color: #0069d9;
+        transform: translateY(-2px);
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+        transform: translateY(-2px);
+    }
+    
+    .input-with-icon {
+        position: relative;
+    }
+    
+    .input-with-icon i {
+        position: absolute;
+        top: 50%;
+        left: 1rem;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    .input-with-icon input, 
+    .input-with-icon textarea {
+        padding-left: 2.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="perfil-container">
+        <div class="perfil-header">
+            <h2>Editar Perfil</h2>
+            <p>Actualiza tu información personal y foto de perfil</p>
+        </div>
+        
+        <form action="{{ url_for('editar_perfil') }}" method="POST" enctype="multipart/form-data">
+            <div class="avatar-container">
+                <img src="{{ usuario.foto_perfil or '/static/images/default-avatar.png' }}" 
+                     alt="Foto de Perfil" 
+                     class="perfil-avatar" 
+                     id="avatar-preview">
+                
+                <div class="upload-avatar-btn btn btn-success">
+                    <i class="fas fa-camera"></i> Cambiar Foto
+                    <input type="file" name="foto_perfil" id="foto_perfil" 
+                           accept=".jpg,.jpeg,.png,.gif" 
+                           onchange="previewAvatar(this)">
+                </div>
+                
+                <div class="avatar-info">
+                    <p><i class="fas fa-info-circle"></i> Formatos permitidos: JPG, PNG, GIF</p>
+                    <p><i class="fas fa-exclamation-circle"></i> Tamaño máximo: 5MB</p>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h3 class="form-section-title"><i class="fas fa-user"></i> Información Personal</h3>
+                
+                <div class="form-group mb-3">
+                    <label for="nombre"><i class="fas fa-user-tag"></i> Nombre Completo</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user"></i>
+                        <input type="text" class="form-control" id="nombre" name="nombre" 
+                               value="{{ usuario.nombre }}" required>
+                    </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="email"><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-at"></i>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ usuario.email }}" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h3 class="form-section-title"><i class="fas fa-address-card"></i> Información de Contacto</h3>
+                
+                <div class="form-group mb-3">
+                    <label for="telefono"><i class="fas fa-phone"></i> Teléfono</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                        <input type="tel" class="form-control" id="telefono" name="telefono" 
+                               value="{{ usuario.telefono }}" pattern="[0-9]{10}" 
+                               title="Ingrese un número de teléfono válido de 10 dígitos">
+                    </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="cargo"><i class="fas fa-briefcase"></i> Cargo</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-id-badge"></i>
+                        <input type="text" class="form-control" id="cargo" name="cargo" 
+                               value="{{ usuario.cargo }}" placeholder="Ej: Administrador, Veterinario, Encargado...">
+                    </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="direccion"><i class="fas fa-map-marker-alt"></i> Dirección</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-home"></i>
+                        <textarea class="form-control" id="direccion" name="direccion" 
+                                  rows="2" placeholder="Dirección completa">{{ usuario.direccion }}</textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="btn-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function previewAvatar(input) {
+        const preview = document.getElementById('avatar-preview');
+        const file = input.files[0];
+        const reader = new FileReader();
+
+        // Validar tamaño de archivo
+        if (file.size > 5 * 1024 * 1024) {
+            alert('El archivo es demasiado grande. Máximo 5MB.');
+            input.value = ''; // Limpiar selección
+            return;
+        }
+
+        reader.onloadend = function () {
+            preview.src = reader.result;
+        }
+
+        if (file) {
+            reader.readAsDataURL(file);
+        }
+    }
+</script>
+{% endblock %}

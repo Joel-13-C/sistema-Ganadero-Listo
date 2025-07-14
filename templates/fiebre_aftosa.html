@@ -1,0 +1,432 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro de Fiebre Aftosa{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Registro de Vacunación contra Fiebre Aftosa</h2>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#registroModal">
+            <i class="fas fa-plus"></i> Nuevo Registro
+        </button>
+    </div>
+
+    <!-- Tabla de Registros -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Registros de Vacunación</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>N° Certificado</th>
+                            <th>Propietario</th>
+                            <th>Predio</th>
+                            <th>Ubicación</th>
+                            <th>Tipo Explotación</th>
+                            <th>Vacunador</th>
+                            <th>Próxima Aplicación</th>
+                            <th>Animales</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                        <tr>
+                            <td>{{ registro.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ registro.numero_certificado }}</td>
+                            <td>{{ registro.propietario_nombre }}</td>
+                            <td>{{ registro.nombre_predio }}</td>
+                            <td>{{ registro.provincia }}, {{ registro.canton }}, {{ registro.parroquia }}</td>
+                            <td>{{ registro.tipo_explotacion }}</td>
+                            <td>{{ registro.vacunador_nombre }}</td>
+                            <td>{{ registro.fecha_proxima_aplicacion.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-info" 
+                                        onclick="verAnimales('{{ registro.id }}')">
+                                    Ver ({{ registro.cantidad_animales }})
+                                </button>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" 
+                                        onclick="verDetalles('{{ registro.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="{{ url_for('generar_certificado_aftosa', certificado_id=registro.id) }}"
+                                   class="btn btn-sm btn-success" title="Generar Certificado">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-danger" 
+                                        onclick="confirmarEliminar('{{ registro.id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Registro -->
+    <div class="modal fade" id="registroModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nuevo Registro de Vacunación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" action="{{ url_for('registrar_fiebre_aftosa') }}" id="formRegistro">
+                        <!-- Información del Certificado -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Información del Certificado</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="fecha_registro" class="form-label">Fecha de Registro</label>
+                                        <input type="date" class="form-control" id="fecha_registro" name="fecha_registro" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="numero_certificado" class="form-label">Número de Certificado</label>
+                                        <input type="text" class="form-control" id="numero_certificado" name="numero_certificado" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="proxima_aplicacion" class="form-label">Próxima Aplicación</label>
+                                        <div class="form-control" id="proxima_aplicacion" style="background-color: #e9ecef;">
+                                            Calculando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información del Propietario y Predio -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Información del Propietario y Predio</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="propietario_nombre" class="form-label">Nombre del Propietario</label>
+                                        <input type="text" class="form-control" id="propietario_nombre" name="propietario_nombre" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="propietario_documento" class="form-label">C.C. / R.U.C.</label>
+                                        <input type="text" class="form-control" id="propietario_documento" name="propietario_documento" 
+                                               pattern="[0-9]{10}|[0-9]{13}" title="Ingrese 10 dígitos para cédula o 13 para RUC" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="nombre_predio" class="form-label">Nombre del Predio</label>
+                                        <input type="text" class="form-control" id="nombre_predio" name="nombre_predio" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ubicación -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Ubicación del Predio</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="provincia_id" class="form-label">Provincia</label>
+                                        <select class="form-select" id="provincia_id" name="provincia_id" required>
+                                            <option value="">Seleccione una provincia</option>
+                                            {% for provincia in provincias %}
+                                            <option value="{{ provincia.id }}">{{ provincia.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="canton_id" class="form-label">Cantón</label>
+                                        <select class="form-select" id="canton_id" name="canton_id" required>
+                                            <option value="">Seleccione un cantón</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="parroquia_id" class="form-label">Parroquia</label>
+                                        <select class="form-select" id="parroquia_id" name="parroquia_id" required>
+                                            <option value="">Seleccione una parroquia</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información de la Explotación -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Información de la Explotación</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="tipo_explotacion" class="form-label">Tipo de Explotación</label>
+                                        <select class="form-select" id="tipo_explotacion" name="tipo_explotacion" required>
+                                            <option value="">Seleccione el tipo</option>
+                                            <option value="Carne">Carne</option>
+                                            <option value="Leche">Leche</option>
+                                            <option value="Mixta">Mixta</option>
+                                            <option value="Lidia">Lidia</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información del Vacunador -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Información del Vacunador</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="vacunador_nombre" class="form-label">Nombre del Vacunador</label>
+                                        <input type="text" class="form-control" id="vacunador_nombre" name="vacunador_nombre" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="vacunador_cedula" class="form-label">Cédula del Vacunador</label>
+                                        <input type="text" class="form-control" id="vacunador_cedula" name="vacunador_cedula" 
+                                               pattern="[0-9]{10}" title="Ingrese 10 dígitos" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Selección de Animales -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Selección de Animales</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_general" value="general" checked>
+                                            <label class="form-check-label" for="aplicacion_general">
+                                                Aplicación General (Todos los animales)
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_especifica" value="especifica">
+                                            <label class="form-check-label" for="aplicacion_especifica">
+                                                Aplicación Específica (Seleccionar animales)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="seleccion_animales" style="display: none;">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Seleccionar</th>
+                                                    <th>N° Arete</th>
+                                                    <th>Nombre</th>
+                                                    <th>Condición</th>
+                                                    <th>Última Vacunación</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for animal in animales %}
+                                                <tr>
+                                                    <td>
+                                                        <input type="checkbox" name="animales_seleccionados[]" 
+                                                               value="{{ animal.id }}" class="form-check-input">
+                                                    </td>
+                                                    <td>{{ animal.numero_arete }}</td>
+                                                    <td>{{ animal.nombre }}</td>
+                                                    <td>{{ animal.condicion }}</td>
+                                                    <td>
+                                                        {% if animal.ultima_aftosa %}
+                                                            {{ animal.ultima_aftosa.strftime('%d/%m/%Y') }}
+                                                        {% else %}
+                                                            Sin registro
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Registro</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalles de Animales -->
+    <div class="modal fade" id="animalesModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Animales Vacunados</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>N° Arete</th>
+                                    <th>Nombre</th>
+                                    <th>Condición</th>
+                                </tr>
+                            </thead>
+                            <tbody id="animalesVacunadosBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación para Eliminar -->
+    <div class="modal fade" id="eliminarModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Está seguro que desea eliminar este registro de vacunación contra fiebre aftosa?</p>
+                    <p class="text-danger"><strong>Esta acción no se puede deshacer.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <form id="formEliminar" method="POST">
+                        <button type="submit" class="btn btn-danger">Eliminar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: none;
+        margin-bottom: 1.5rem;
+    }
+    .card-header {
+        background-color: #0d6efd;
+        color: white;
+        border-bottom: none;
+    }
+    .table th {
+        background-color: #f8f9fa;
+    }
+    .btn-info {
+        color: white;
+    }
+    .modal-xl {
+        max-width: 95%;
+    }
+    @media (min-width: 1200px) {
+        .modal-xl {
+            max-width: 1140px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/ubicacion.js') }}"></script>
+<script>
+    // Elementos del formulario
+    const fechaRegistroInput = document.getElementById('fecha_registro');
+    const proximaAplicacionDiv = document.getElementById('proxima_aplicacion');
+    const aplicacionGeneralRadio = document.getElementById('aplicacion_general');
+    const aplicacionEspecificaRadio = document.getElementById('aplicacion_especifica');
+    const seleccionAnimalesDiv = document.getElementById('seleccion_animales');
+
+    // Función para calcular la próxima aplicación
+    function calcularProximaAplicacion() {
+        const fechaRegistro = new Date(fechaRegistroInput.value);
+        if (!isNaN(fechaRegistro)) {
+            const proximaAplicacion = new Date(fechaRegistro);
+            proximaAplicacion.setMonth(proximaAplicacion.getMonth() + 6);
+            proximaAplicacionDiv.textContent = proximaAplicacion.toLocaleDateString();
+        } else {
+            proximaAplicacionDiv.textContent = 'Calculando...';
+        }
+    }
+
+    // Event listener para fecha de registro
+    fechaRegistroInput.addEventListener('change', calcularProximaAplicacion);
+
+    // Event listeners para tipo de aplicación
+    aplicacionGeneralRadio.addEventListener('change', function() {
+        seleccionAnimalesDiv.style.display = 'none';
+    });
+
+    aplicacionEspecificaRadio.addEventListener('change', function() {
+        seleccionAnimalesDiv.style.display = 'block';
+    });
+
+    // Función para ver detalles de un registro
+    function verDetalles(registroId) {
+        window.location.href = `/ver_registro_fiebre_aftosa/${registroId}`;
+    }
+
+    // Función para ver animales vacunados
+    function verAnimales(registroId) {
+        fetch(`/obtener_animales_vacunados/${registroId}`)
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.getElementById('animalesVacunadosBody');
+                tbody.innerHTML = '';
+                
+                data.forEach(animal => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${animal.numero_arete}</td>
+                        <td>${animal.nombre}</td>
+                        <td>${animal.condicion}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                new bootstrap.Modal(document.getElementById('animalesModal')).show();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al cargar los animales');
+            });
+    }
+    
+    // Función para confirmar eliminación de un registro
+    function confirmarEliminar(registroId) {
+        // Configurar el formulario para enviar a la ruta correcta
+        const formEliminar = document.getElementById('formEliminar');
+        formEliminar.action = `/eliminar_fiebre_aftosa/${registroId}`;
+        
+        // Mostrar el modal de confirmación
+        new bootstrap.Modal(document.getElementById('eliminarModal')).show();
+    }
+</script>
+{% endblock %}

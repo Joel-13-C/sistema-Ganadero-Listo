@@ -1,0 +1,602 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="text-primary"><i class="fas fa-sitemap me-2"></i>Genealogía del Ganado</h2>
+            <p class="text-muted">Gestiona las relaciones familiares y características heredadas de tu ganado</p>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#modalGenealogia">
+                <i class="fas fa-plus-circle me-1"></i> Nuevo Registro
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Tarjetas de resumen -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-gradient-primary text-white shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Total Registros</h6>
+                            <h2 class="mb-0">{{ genealogia|length }}</h2>
+                        </div>
+                        <div class="icon-circle bg-white bg-opacity-25">
+                            <i class="fas fa-dna fa-2x text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-gradient-success text-white shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Líneas Completas</h6>
+                            <h2 class="mb-0">{{ genealogia|selectattr('padre_nombre')|selectattr('madre_nombre')|list|length }}</h2>
+                        </div>
+                        <div class="icon-circle bg-white bg-opacity-25">
+                            <i class="fas fa-check-circle fa-2x text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-gradient-info text-white shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Solo Padre</h6>
+                            <h2 class="mb-0">{{ genealogia|selectattr('padre_nombre')|rejectattr('madre_nombre')|list|length }}</h2>
+                        </div>
+                        <div class="icon-circle bg-white bg-opacity-25">
+                            <i class="fas fa-male fa-2x text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase mb-1">Solo Madre</h6>
+                            <h2 class="mb-0">{{ genealogia|rejectattr('padre_nombre')|selectattr('madre_nombre')|list|length }}</h2>
+                        </div>
+                        <div class="icon-circle bg-white bg-opacity-25">
+                            <i class="fas fa-female fa-2x text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtro y búsqueda -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light py-3">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="mb-0 text-primary"><i class="fas fa-filter me-2"></i>Filtros</h5>
+                </div>
+                <div class="col-md-4">
+                    <input type="text" id="buscarGenealogia" class="form-control" placeholder="Buscar animal...">
+                </div>
+            </div>
+        </div>
+        <div class="card-body py-2">
+            <div class="row">
+                <div class="col-md-4">
+                    <select id="filtroTipo" class="form-select">
+                        <option value="">Todos los registros</option>
+                        <option value="completo">Línea completa (padre y madre)</option>
+                        <option value="padre">Solo padre conocido</option>
+                        <option value="madre">Solo madre conocida</option>
+                        <option value="ninguno">Sin padres registrados</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select id="filtroAnimal" class="form-select">
+                        <option value="">Todos los animales</option>
+                        {% for animal in animales %}
+                        <option value="{{ animal.nombre }}">{{ animal.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button id="btnLimpiarFiltros" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo me-1"></i>Limpiar filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de genealogía -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 text-primary"><i class="fas fa-list me-2"></i>Registros Genealógicos</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="tablaGenealogia">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Animal</th>
+                            <th>Padre</th>
+                            <th>Madre</th>
+                            <th>Características Heredadas</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gen in genealogia %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="icon-circle bg-light me-2">
+                                        <i class="fas fa-cow text-primary"></i>
+                                    </div>
+                                    <span class="fw-bold">{{ gen.nombre_animal }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if gen.padre_nombre %}
+                                <div class="d-flex align-items-center">
+                                    <div class="icon-circle bg-primary bg-opacity-10 me-2">
+                                        <i class="fas fa-male text-primary"></i>
+                                    </div>
+                                    <span>{{ gen.padre_nombre }}</span>
+                                </div>
+                                {% else %}
+                                <span class="text-muted"><i class="fas fa-question-circle me-1"></i>No registrado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if gen.madre_nombre %}
+                                <div class="d-flex align-items-center">
+                                    <div class="icon-circle bg-danger bg-opacity-10 me-2">
+                                        <i class="fas fa-female text-danger"></i>
+                                    </div>
+                                    <span>{{ gen.madre_nombre }}</span>
+                                </div>
+                                {% else %}
+                                <span class="text-muted"><i class="fas fa-question-circle me-1"></i>No registrada</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if gen.caracteristicas_heredadas %}
+                                <span class="text-truncate d-inline-block" style="max-width: 250px;" data-bs-toggle="tooltip" title="{{ gen.caracteristicas_heredadas }}">
+                                    {{ gen.caracteristicas_heredadas }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">Sin características registradas</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editarGenealogia({{ gen.id }})" title="Editar registro">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarGenealogia({{ gen.id }})" title="Eliminar registro">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nueva genealogía -->
+<div class="modal fade" id="modalGenealogia" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Registro Genealógico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formGenealogia" method="POST" action="{{ url_for('agregar_genealogia') }}">
+                    <div class="mb-3">
+                        <label for="animal_id" class="form-label">Animal</label>
+                        <select class="form-select" id="animal_id" name="animal_id" required>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="padre_id" class="form-label">Padre</label>
+                        <select class="form-select" id="padre_id" name="padre_id">
+                            <option value="">Seleccione el padre</option>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="madre_id" class="form-label">Madre</label>
+                        <select class="form-select" id="madre_id" name="madre_id">
+                            <option value="">Seleccione la madre</option>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="caracteristicas_heredadas" class="form-label">Características Heredadas</label>
+                        <textarea class="form-control" id="caracteristicas_heredadas" name="caracteristicas_heredadas" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formGenealogia" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar genealogía -->
+<div class="modal fade" id="modalEditarGenealogia" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Registro Genealógico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarGenealogia" method="POST">
+                    <div class="mb-3">
+                        <label for="edit_animal_id" class="form-label">Animal</label>
+                        <select class="form-select" id="edit_animal_id" name="animal_id" required>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_padre_id" class="form-label">Padre</label>
+                        <select class="form-select" id="edit_padre_id" name="padre_id">
+                            <option value="">Seleccione el padre</option>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_madre_id" class="form-label">Madre</label>
+                        <select class="form-select" id="edit_madre_id" name="madre_id">
+                            <option value="">Seleccione la madre</option>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_caracteristicas_heredadas" class="form-label">Características Heredadas</label>
+                        <textarea class="form-control" id="edit_caracteristicas_heredadas" name="caracteristicas_heredadas" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarEdicion()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+let genealogiaId;
+
+// Función para ver detalles de genealogía
+function verDetallesGenealogia(id) {
+    fetch(`/obtener_genealogia/${id}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al obtener los datos del registro genealógico');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Crear contenido para SweetAlert2
+            let caracteristicas = data.caracteristicas_heredadas || 'Sin características registradas';
+            let padre = data.padre_nombre || 'No registrado';
+            let madre = data.madre_nombre || 'No registrada';
+            
+            Swal.fire({
+                title: `Genealogía de ${data.nombre_animal}`,
+                html: `
+                    <div class="text-start">
+                        <div class="mb-3">
+                            <h6 class="text-primary">Información del Animal</h6>
+                            <p class="mb-1"><strong>ID:</strong> ${data.animal_id}</p>
+                            <p class="mb-1"><strong>Nombre:</strong> ${data.nombre_animal}</p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-primary">Padres</h6>
+                            <p class="mb-1"><strong>Padre:</strong> ${padre}</p>
+                            <p class="mb-1"><strong>Madre:</strong> ${madre}</p>
+                        </div>
+                        <div>
+                            <h6 class="text-primary">Características Heredadas</h6>
+                            <p>${caracteristicas}</p>
+                        </div>
+                    </div>
+                `,
+                width: '600px',
+                confirmButtonText: 'Cerrar',
+                confirmButtonColor: '#3085d6'
+            });
+        })
+        .catch(error => {
+            Swal.fire({
+                title: 'Error',
+                text: error.message,
+                icon: 'error'
+            });
+        });
+}
+
+// Función para editar genealogía
+function editarGenealogia(id) {
+    genealogiaId = id;
+    fetch(`/obtener_genealogia/${id}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al obtener los datos del registro genealógico');
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById('edit_animal_id').value = data.animal_id;
+            document.getElementById('edit_padre_id').value = data.padre_id || '';
+            document.getElementById('edit_madre_id').value = data.madre_id || '';
+            document.getElementById('edit_caracteristicas_heredadas').value = data.caracteristicas_heredadas || '';
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalEditarGenealogia'));
+            modal.show();
+        })
+        .catch(error => {
+            Swal.fire({
+                title: 'Error',
+                text: error.message,
+                icon: 'error'
+            });
+        });
+}
+
+// Función para guardar edición
+function guardarEdicion() {
+    const form = document.getElementById('formEditarGenealogia');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    const formData = new FormData(form);
+    
+    fetch(`/editar_genealogia/${genealogiaId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error al guardar los cambios');
+        }
+        Swal.fire({
+            title: 'Éxito',
+            text: 'Registro genealógico actualizado correctamente',
+            icon: 'success',
+            confirmButtonText: 'Aceptar'
+        }).then(() => {
+            window.location.reload();
+        });
+    })
+    .catch(error => {
+        Swal.fire({
+            title: 'Error',
+            text: error.message,
+            icon: 'error'
+        });
+    });
+}
+
+// Función para eliminar genealogía
+function eliminarGenealogia(id) {
+    Swal.fire({
+        title: '¿Eliminar registro?',
+        text: 'Esta acción no se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`/eliminar_genealogia/${id}`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error al eliminar el registro');
+                }
+                Swal.fire({
+                    title: 'Eliminado',
+                    text: 'El registro genealógico ha sido eliminado',
+                    icon: 'success'
+                }).then(() => {
+                    window.location.reload();
+                });
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: 'Error',
+                    text: error.message,
+                    icon: 'error'
+                });
+            });
+        }
+    });
+}
+
+// Función para filtrar registros genealógicos
+function filtrarGenealogia() {
+    const textoBusqueda = document.getElementById('buscarGenealogia').value.toLowerCase();
+    const filtroTipo = document.getElementById('filtroTipo').value;
+    const filtroAnimal = document.getElementById('filtroAnimal').value;
+    
+    const filas = document.querySelectorAll('#tablaGenealogia tbody tr');
+    
+    filas.forEach(fila => {
+        const animal = fila.querySelector('td:nth-child(1)').textContent.toLowerCase();
+        const padre = fila.querySelector('td:nth-child(2)').textContent.toLowerCase();
+        const madre = fila.querySelector('td:nth-child(3)').textContent.toLowerCase();
+        const caracteristicas = fila.querySelector('td:nth-child(4)').textContent.toLowerCase();
+        
+        // Aplicar filtros
+        let mostrar = true;
+        
+        // Filtro de texto
+        if (textoBusqueda && !animal.includes(textoBusqueda) && 
+            !padre.includes(textoBusqueda) && 
+            !madre.includes(textoBusqueda) && 
+            !caracteristicas.includes(textoBusqueda)) {
+            mostrar = false;
+        }
+        
+        // Filtro de tipo de registro
+        if (filtroTipo) {
+            const tienePadre = !padre.includes('no registrado');
+            const tieneMadre = !madre.includes('no registrada');
+            
+            if (filtroTipo === 'completo' && (!tienePadre || !tieneMadre)) {
+                mostrar = false;
+            } else if (filtroTipo === 'padre' && (!tienePadre || tieneMadre)) {
+                mostrar = false;
+            } else if (filtroTipo === 'madre' && (tienePadre || !tieneMadre)) {
+                mostrar = false;
+            } else if (filtroTipo === 'ninguno' && (tienePadre || tieneMadre)) {
+                mostrar = false;
+            }
+        }
+        
+        // Filtro de animal
+        if (filtroAnimal && !animal.includes(filtroAnimal.toLowerCase())) {
+            mostrar = false;
+        }
+        
+        // Mostrar u ocultar fila
+        fila.style.display = mostrar ? '' : 'none';
+    });
+    
+    // Actualizar contador de resultados
+    const filasVisibles = document.querySelectorAll('#tablaGenealogia tbody tr:not([style*="display: none"])');
+    if (filasVisibles.length === 0) {
+        // Si no hay resultados, mostrar mensaje
+        const tbody = document.querySelector('#tablaGenealogia tbody');
+        if (!document.getElementById('sin-resultados')) {
+            const filaNoResultados = document.createElement('tr');
+            filaNoResultados.id = 'sin-resultados';
+            filaNoResultados.innerHTML = `<td colspan="5" class="text-center py-3"><i class="fas fa-search me-2"></i>No se encontraron registros genealógicos con los filtros seleccionados</td>`;
+            tbody.appendChild(filaNoResultados);
+        }
+    } else {
+        // Si hay resultados, eliminar mensaje si existe
+        const filaNoResultados = document.getElementById('sin-resultados');
+        if (filaNoResultados) {
+            filaNoResultados.remove();
+        }
+    }
+}
+
+// Inicializar componentes al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips de Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Agregar CSS personalizado para los círculos de iconos
+    const style = document.createElement('style');
+    style.textContent = `
+        .icon-circle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+        }
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        }
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+        }
+        .bg-gradient-info {
+            background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
+        }
+        .bg-gradient-warning {
+            background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);
+        }
+        .bg-opacity-10 {
+            opacity: 0.1;
+        }
+        .bg-opacity-25 {
+            opacity: 0.25;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Configurar eventos para filtros
+    if (document.getElementById('buscarGenealogia')) {
+        document.getElementById('buscarGenealogia').addEventListener('input', filtrarGenealogia);
+    }
+    if (document.getElementById('filtroTipo')) {
+        document.getElementById('filtroTipo').addEventListener('change', filtrarGenealogia);
+    }
+    if (document.getElementById('filtroAnimal')) {
+        document.getElementById('filtroAnimal').addEventListener('change', filtrarGenealogia);
+    }
+    
+    // Configurar botón para limpiar filtros
+    if (document.getElementById('btnLimpiarFiltros')) {
+        document.getElementById('btnLimpiarFiltros').addEventListener('click', function() {
+            document.getElementById('buscarGenealogia').value = '';
+            document.getElementById('filtroTipo').value = '';
+            document.getElementById('filtroAnimal').value = '';
+            filtrarGenealogia();
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

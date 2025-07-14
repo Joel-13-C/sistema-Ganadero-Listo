@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Registro de Asistencias</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalRegistrarAsistencia">
+                <i class="fas fa-plus"></i> Registrar Asistencia
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Filtros -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form id="formFiltros" class="row g-3">
+                <div class="col-md-4">
+                    <label for="empleado" class="form-label">Empleado</label>
+                    <select class="form-select" id="empleado" name="empleado">
+                        <option value="">Todos</option>
+                        {% for empleado in empleados %}
+                            <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
+                    <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio">
+                </div>
+                <div class="col-md-3">
+                    <label for="fecha_fin" class="form-label">Fecha Fin</label>
+                    <input type="date" class="form-control" id="fecha_fin" name="fecha_fin">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de Asistencias -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Empleado</th>
+                            <th>Hora Entrada</th>
+                            <th>Hora Salida</th>
+                            <th>Estado</th>
+                            <th>Observaciones</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asistencia in asistencias %}
+                        <tr>
+                            <td>{{ asistencia.fecha }}</td>
+                            <td>{{ asistencia.empleado_nombre }}</td>
+                            <td>{{ asistencia.hora_entrada }}</td>
+                            <td>{{ asistencia.hora_salida or '-' }}</td>
+                            <td>
+                                <span class="badge {% if asistencia.estado == 'Presente' %}bg-success{% elif asistencia.estado == 'Tardanza' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ asistencia.estado }}
+                                </span>
+                            </td>
+                            <td>{{ asistencia.observaciones or '-' }}</td>
+                            <td>
+                                {% if not asistencia.hora_salida %}
+                                <button class="btn btn-sm btn-success" onclick="registrarSalida({{ asistencia.id }})">
+                                    <i class="fas fa-sign-out-alt"></i> Salida
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-warning" onclick="editarAsistencia({{ asistencia.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarAsistencia({{ asistencia.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registrar Asistencia -->
+<div class="modal fade" id="modalRegistrarAsistencia" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Asistencia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRegistrarAsistencia" action="{{ url_for('registrar_asistencia') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="empleado_id" class="form-label">Empleado</label>
+                        <select class="form-select" id="empleado_id" name="empleado_id" required>
+                            <option value="">Seleccione un empleado</option>
+                            {% for empleado in empleados %}
+                                <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hora_entrada" class="form-label">Hora Entrada</label>
+                        <input type="time" class="form-control" id="hora_entrada" name="hora_entrada" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="estado" class="form-label">Estado</label>
+                        <select class="form-select" id="estado" name="estado" required>
+                            <option value="Presente">Presente</option>
+                            <option value="Tardanza">Tardanza</option>
+                            <option value="Ausente">Ausente</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formRegistrarAsistencia" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function registrarSalida(id) {
+    if (confirm('¿Desea registrar la salida del empleado?')) {
+        fetch(`/asistencias/salida/${id}`, {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al registrar la salida: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al registrar la salida');
+        });
+    }
+}
+
+function editarAsistencia(id) {
+    // Implementar edición
+}
+
+function eliminarAsistencia(id) {
+    if (confirm('¿Está seguro de que desea eliminar este registro de asistencia?')) {
+        fetch(`/asistencias/eliminar/${id}`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al eliminar la asistencia: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar la asistencia');
+        });
+    }
+}
+
+// Inicializar fechas por defecto
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    document.getElementById('fecha_inicio').valueAsDate = firstDayOfMonth;
+    document.getElementById('fecha_fin').valueAsDate = today;
+    document.getElementById('fecha').valueAsDate = today;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,746 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema Ganadero - Desparasitación{% endblock %}
+
+{% block extra_css %}
+<style>
+.card {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    border: none;
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #4CAF50, #2E7D32);
+    color: white;
+    border-radius: 10px 10px 0 0 !important;
+    padding: 15px 20px;
+    font-weight: 500;
+    border: none;
+}
+
+.card-title {
+    margin-bottom: 0;
+    font-weight: 600;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-top: none;
+    padding: 12px 15px;
+}
+
+.table td {
+    padding: 12px 15px;
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(76, 175, 80, 0.05);
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.5em 0.8em;
+    border-radius: 30px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.badge.bg-success {
+    background-color: #43A047 !important;
+}
+
+.badge.bg-info {
+    background-color: #039BE5 !important;
+}
+
+.btn-primary {
+    background-color: #2E7D32;
+    border-color: #2E7D32;
+    padding: 8px 20px;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #388E3C;
+    border-color: #388E3C;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-info {
+    background-color: #039BE5;
+    border-color: #039BE5;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #0288D1;
+    border-color: #0288D1;
+    color: white;
+}
+
+.form-control, .form-select {
+    border-radius: 5px;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    transition: all 0.3s;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25);
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #424242;
+}
+
+.form-check-input:checked {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.alert-info {
+    background-color: #E8F5E9;
+    border-color: #C8E6C9;
+    color: #2E7D32;
+    border-radius: 8px;
+}
+
+.section-title {
+    position: relative;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-weight: 600;
+    color: #2E7D32;
+}
+
+.section-title:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 50px;
+    height: 3px;
+    background: #4CAF50;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #4CAF50, #2E7D32);
+    color: white;
+    border: none;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.btn-close {
+    color: white;
+    opacity: 1;
+}
+
+.proxima-vencida {
+    color: #D32F2F;
+    font-weight: 500;
+}
+
+.proxima-vigente {
+    color: #388E3C;
+    font-weight: 500;
+}
+
+.animal-row.selected {
+    background-color: rgba(76, 175, 80, 0.1);
+}
+
+.icon-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #E8F5E9;
+    margin-right: 10px;
+}
+
+.icon-container i {
+    color: #2E7D32;
+    font-size: 1.2rem;
+}
+
+.stats-card {
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.stats-card-primary {
+    background-color: #E8F5E9;
+    border-left: 4px solid #4CAF50;
+}
+
+.stats-card-warning {
+    background-color: #FFF8E1;
+    border-left: 4px solid #FFC107;
+}
+
+.stats-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0;
+    color: #424242;
+}
+
+.stats-label {
+    color: #757575;
+    font-size: 0.9rem;
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex align-items-center mb-4">
+        <div class="icon-container">
+            <i class="ri-virus-line"></i>
+        </div>
+        <h2 class="section-title mb-0">Control de Desparasitación</h2>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="stats-card stats-card-primary">
+                <div>
+                    <p class="stats-number">{{ registros|length }}</p>
+                    <p class="stats-label">Total de Desparasitaciones</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="stats-card stats-card-warning">
+                <div>
+                    <p class="stats-number">{{ proximas_vencidas|default(0) }}</p>
+                    <p class="stats-label">Próximas a Vencer</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generación de reportes -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title">
+                <i class="ri-file-pdf-line me-2"></i>Reportes PDF
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <a href="{{ url_for('generar_reporte_desparasitacion') }}" class="btn btn-success w-100">
+                        <i class="fas fa-file-pdf me-2"></i>Generar Reporte Completo
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#modalFiltroFechas">
+                        <i class="fas fa-calendar-alt me-2"></i>Reporte por Fechas
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para filtro de fechas -->
+    <div class="modal fade" id="modalFiltroFechas" tabindex="-1" aria-labelledby="modalFiltroFechasLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalFiltroFechasLabel">
+                        <i class="fas fa-calendar-alt me-2"></i>Generar Reporte por Fechas
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formFiltroFechas">
+                        <div class="mb-3">
+                            <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
+                            <input type="date" class="form-control" id="fecha_inicio" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="fecha_fin" class="form-label">Fecha Fin</label>
+                            <input type="date" class="form-control" id="fecha_fin" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="generarReportePorFechas()">
+                        <i class="fas fa-file-pdf me-2"></i>Generar Reporte
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de registro -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title">
+                <i class="ri-add-line me-2"></i>Nuevo Registro de Desparasitación
+            </h5>
+        </div>
+        <div class="card-body">
+            <form id="formDesparasitacion" method="POST" action="{{ url_for('registrar_desparasitacion') }}">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="fecha_registro" class="form-label">Fecha de Registro</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="ri-calendar-line"></i></span>
+                            <input type="date" class="form-control" id="fecha_registro" name="fecha_registro" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="producto" class="form-label">Producto a Aplicar</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="ri-medicine-bottle-line"></i></span>
+                            <select class="form-select" id="producto" name="producto" required>
+                                <option value="">Seleccione un producto</option>
+                                <option value="Ivermectina">Ivermectina</option>
+                                <option value="Dectomax">Dectomax</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div id="otroProducto" class="mt-2 d-none">
+                            <input type="text" class="form-control" name="otro_producto" placeholder="Especifique el producto">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="tipo_aplicacion" class="form-label">Tipo de Aplicación</label>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_general" value="general" checked>
+                            <label class="form-check-label" for="aplicacion_general">
+                                <i class="ri-group-line me-1"></i> Aplicar a todo el ganado
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_especifica" value="especifica">
+                            <label class="form-check-label" for="aplicacion_especifica">
+                                <i class="ri-user-search-line me-1"></i> Aplicar a animales específicos
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="vacunador" class="form-label">Nombre del Vacunador</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="ri-user-line"></i></span>
+                            <input type="text" class="form-control" id="vacunador" name="vacunador" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="seleccion_animales" class="mb-3 d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label mb-0">Seleccionar Animales</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="seleccionar_todos">
+                            <label class="form-check-label" for="seleccionar_todos">
+                                Seleccionar todos
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;"></th>
+                                    <th>ID</th>
+                                    <th>Número de Arete</th>
+                                    <th>Condición</th>
+                                    <th>Última Desparasitación</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for animal in animales %}
+                                <tr class="animal-row">
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input animal-checkbox" type="checkbox" name="animales[]" value="{{ animal.id }}">
+                                        </div>
+                                    </td>
+                                    <td>{{ animal.id }}</td>
+                                    <td>{{ animal.numero_arete }}</td>
+                                    <td>{{ animal.categoria }}</td>
+                                    <td>
+                                        {% if animal.ultima_desparasitacion %}
+                                            <span class="{% if animal.requiere_desparasitacion %}proxima-vencida{% else %}proxima-vigente{% endif %}">
+                                                {{ animal.ultima_desparasitacion }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">Sin registro</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="ri-calendar-line me-2"></i>
+                            <div>
+                                <strong>Próxima aplicación recomendada:</strong>
+                                <span id="proxima_aplicacion">Seleccione una fecha de registro</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ri-save-line me-1"></i> Registrar Desparasitación
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de registros -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="card-title">
+                <i class="ri-history-line me-2"></i>Historial de Desparasitaciones
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Producto</th>
+                            <th>Tipo</th>
+                            <th>Animales</th>
+                            <th>Vacunador</th>
+                            <th>Próxima Aplicación</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                        <tr>
+                            <td>{{ registro.fecha_registro }}</td>
+                            <td>{{ registro.producto }}</td>
+                            <td>
+                                {% if registro.aplicacion_general %}
+                                    <span class="badge bg-success">General</span>
+                                {% else %}
+                                    <span class="badge bg-info">Específica</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if registro.aplicacion_general %}
+                                <span class="badge bg-light text-dark">Todos</span>
+                                {% else %}
+                                <span class="badge bg-light text-dark">{{ registro.cantidad_animales }} animales</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ registro.vacunador }}</td>
+                            <td>
+                                {% if registro.proxima_aplicacion < hoy %}
+                                <span class="proxima-vencida">
+                                    <i class="ri-error-warning-line"></i> {{ registro.proxima_aplicacion }}
+                                </span>
+                                {% else %}
+                                <span class="proxima-vigente">
+                                    <i class="ri-check-line"></i> {{ registro.proxima_aplicacion }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-info" onclick="verDetalles('{{ registro.id }}')">
+                                        <i class="ri-eye-line"></i> Ver
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="confirmarEliminar('{{ registro.id }}')">
+                                        <i class="ri-delete-bin-line"></i> Eliminar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de detalles -->
+<div class="modal fade" id="detallesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ri-information-line me-2"></i>Detalles de la Desparasitación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesContenido">
+                <!-- El contenido se cargará dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación para eliminar -->
+<div class="modal fade" id="eliminarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ri-error-warning-line me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar este registro de desparasitación?</p>
+                <p class="text-danger"><strong>Esta acción no se puede deshacer.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formEliminar" method="POST">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="ri-delete-bin-line me-1"></i>Eliminar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejo del tipo de aplicación
+    const aplicacionGeneral = document.getElementById('aplicacion_general');
+    const aplicacionEspecifica = document.getElementById('aplicacion_especifica');
+    const seleccionAnimales = document.getElementById('seleccion_animales');
+
+    function toggleSeleccionAnimales() {
+        seleccionAnimales.classList.toggle('d-none', aplicacionGeneral.checked);
+    }
+
+    aplicacionGeneral.addEventListener('change', toggleSeleccionAnimales);
+    aplicacionEspecifica.addEventListener('change', toggleSeleccionAnimales);
+
+    // Manejo de la selección de producto
+    const producto = document.getElementById('producto');
+    const otroProducto = document.getElementById('otroProducto');
+
+    producto.addEventListener('change', function() {
+        otroProducto.classList.toggle('d-none', this.value !== 'Otro');
+    });
+
+    // Cálculo de próxima aplicación
+    const fechaRegistro = document.getElementById('fecha_registro');
+    const proximaAplicacion = document.getElementById('proxima_aplicacion');
+
+    fechaRegistro.addEventListener('change', function() {
+        if (this.value) {
+            const fecha = new Date(this.value);
+            fecha.setMonth(fecha.getMonth() + 3);
+            const opciones = {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            };
+            proximaAplicacion.textContent = fecha.toLocaleDateString('es-ES', opciones);
+        }
+    });
+
+    // Seleccionar todos los animales
+    const seleccionarTodos = document.getElementById('seleccionar_todos');
+    const animalCheckboxes = document.querySelectorAll('.animal-checkbox');
+    const animalRows = document.querySelectorAll('.animal-row');
+
+    seleccionarTodos.addEventListener('change', function() {
+        animalCheckboxes.forEach((checkbox, index) => {
+            checkbox.checked = this.checked;
+            animalRows[index].classList.toggle('selected', this.checked);
+        });
+    });
+
+    // Resaltar filas seleccionadas
+    animalCheckboxes.forEach((checkbox, index) => {
+        checkbox.addEventListener('change', function() {
+            animalRows[index].classList.toggle('selected', this.checked);
+        });
+    });
+});
+
+// Función para ver detalles
+function verDetalles(id) {
+    // Mostrar un indicador de carga
+    document.getElementById('detallesContenido').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando detalles...</p>
+        </div>
+    `;
+    
+    // Mostrar el modal inmediatamente con el indicador de carga
+    const detallesModal = new bootstrap.Modal(document.getElementById('detallesModal'));
+    detallesModal.show();
+    
+    fetch(`/desparasitacion/detalles/${id}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            let contenidoHTML = `
+                <div class="table-responsive">
+                    <table class="table">
+                        <tr>
+                            <th style="width: 200px;"><i class="ri-calendar-line me-2"></i>Fecha de Registro:</th>
+                            <td>${data.fecha_registro}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="ri-medicine-bottle-line me-2"></i>Producto:</th>
+                            <td>${data.producto}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="ri-user-line me-2"></i>Vacunador:</th>
+                            <td>${data.vacunador}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="ri-calendar-check-line me-2"></i>Próxima Aplicación:</th>
+                            <td>${data.proxima_aplicacion}</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            
+            // Agregar la sección de animales tratados si existen
+            if (data.animales && data.animales.length > 0) {
+                contenidoHTML += `
+                <div class="mt-4">
+                    <h6 class="section-title">Animales Tratados</h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Número de Arete</th>
+                                    <th>Condición</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                // Crear las filas de la tabla de animales
+                data.animales.forEach(animal => {
+                    const identificacion = animal.numero_arete !== undefined ? animal.numero_arete : 'No disponible';
+                    const categoria = animal.condicion !== undefined ? animal.condicion : 'No disponible';
+                    
+                    contenidoHTML += `
+                    <tr>
+                        <td>${animal.id}</td>
+                        <td>${identificacion}</td>
+                        <td>${categoria}</td>
+                    </tr>
+                    `;
+                });
+                
+                contenidoHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                `;
+            }
+            
+            document.getElementById('detallesContenido').innerHTML = contenidoHTML;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('detallesContenido').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ri-error-warning-line me-2"></i>
+                    Error al cargar los detalles: ${error.message}
+                </div>
+            `;
+        });
+}
+</script>
+
+<script>
+// Función para confirmar eliminación
+function confirmarEliminar(id) {
+    // Configurar el formulario con la URL correcta
+    const formEliminar = document.getElementById('formEliminar');
+    formEliminar.action = `/eliminar_desparasitacion/${id}`;
+    
+    // Mostrar el modal de confirmación
+    const eliminarModal = new bootstrap.Modal(document.getElementById('eliminarModal'));
+    eliminarModal.show();
+}
+
+function generarReportePorFechas() {
+    const fechaInicio = document.getElementById('fecha_inicio').value;
+    const fechaFin = document.getElementById('fecha_fin').value;
+    
+    if (!fechaInicio || !fechaFin) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Campos Requeridos',
+            text: 'Por favor seleccione ambas fechas'
+        });
+        return;
+    }
+    
+    if (fechaInicio > fechaFin) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error en Fechas',
+            text: 'La fecha de inicio no puede ser posterior a la fecha fin'
+        });
+        return;
+    }
+    
+    // Redirigir a la URL de generación de reporte con las fechas
+    window.location.href = `{{ url_for('generar_reporte_desparasitacion') }}/${fechaInicio}/${fechaFin}`;
+}
+</script>
+{% endblock %}

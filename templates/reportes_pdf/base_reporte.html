@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ titulo }}</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+        }
+        .header img {
+            max-width: 150px;
+            height: auto;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 10px 0 5px;
+        }
+        .header p {
+            font-size: 12px;
+            margin: 0;
+            color: #666;
+        }
+        .fecha {
+            text-align: right;
+            margin-bottom: 20px;
+            font-size: 11px;
+        }
+        .contenido {
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 15px 0 10px;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            text-align: left;
+            padding: 8px;
+            font-size: 12px;
+        }
+        td {
+            padding: 8px;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+            margin-top: 30px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        .page-number {
+            text-align: right;
+            font-size: 10px;
+        }
+        .resumen {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .resumen p {
+            margin: 5px 0;
+        }
+        .total {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sistema de Gestión Ganadera</h1>
+        <p>{{ titulo }}</p>
+    </div>
+    
+    <div class="fecha">
+        Fecha de generación: {{ fecha_generacion }}
+    </div>
+    
+    <div class="contenido">
+        {% block contenido %}
+        {% endblock %}
+    </div>
+    
+    <div class="footer">
+        <p>Sistema de Gestión Ganadera - Reporte generado el {{ fecha_generacion }}</p>
+        <div class="page-number">Página <pdf:pagenumber> de <pdf:pagecount></div>
+    </div>
+</body>
+</html>

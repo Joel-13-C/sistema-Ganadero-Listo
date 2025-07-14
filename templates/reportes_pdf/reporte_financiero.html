@@ -1,0 +1,95 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block contenido %}
+<h2>Reporte Financiero - {{ periodo }}</h2>
+
+<div class="resumen">
+    <p>Total de ingresos: <span class="total">${{ total_ingresos|round(2) }}</span></p>
+    <p>Total de gastos: <span class="total">${{ total_gastos|round(2) }}</span></p>
+    <p>Balance: <span class="total" style="color: {% if balance >= 0 %}green{% else %}red{% endif %};">${{ balance|round(2) }}</span></p>
+</div>
+
+<h3>Ingresos por Categoría</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Categoría</th>
+            <th>Monto</th>
+            <th>Porcentaje</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for categoria in ingresos_por_categoria %}
+        <tr>
+            <td>{{ categoria.nombre }}</td>
+            <td>${{ categoria.monto|round(2) }}</td>
+            <td>{{ categoria.porcentaje|round(2) }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Gastos por Categoría</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Categoría</th>
+            <th>Monto</th>
+            <th>Porcentaje</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for categoria in gastos_por_categoria %}
+        <tr>
+            <td>{{ categoria.nombre }}</td>
+            <td>${{ categoria.monto|round(2) }}</td>
+            <td>{{ categoria.porcentaje|round(2) }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Detalle de Ingresos</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th>Categoría</th>
+            <th>Monto</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ingreso in ingresos %}
+        <tr>
+            <td>{{ ingreso.fecha }}</td>
+            <td>{{ ingreso.concepto }}</td>
+            <td>{{ ingreso.categoria }}</td>
+            <td>${{ ingreso.monto|round(2) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Detalle de Gastos</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th>Categoría</th>
+            <th>Monto</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for gasto in gastos %}
+        <tr>
+            <td>{{ gasto.fecha }}</td>
+            <td>{{ gasto.concepto }}</td>
+            <td>{{ gasto.categoria }}</td>
+            <td>${{ gasto.monto|round(2) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

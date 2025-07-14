@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Planes de Alimentación</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPlan">
+                <i class="fas fa-plus"></i> Nuevo Plan
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroCategoria" class="form-label">Filtrar por Categoría Animal</label>
+                    <select class="form-select" id="filtroCategoria" onchange="filtrarPlanes()">
+                        <option value="">Todas las categorías</option>
+                        <option value="Ternero">Ternero</option>
+                        <option value="Novillo">Novillo</option>
+                        <option value="Vaca">Vaca</option>
+                        <option value="Toro">Toro</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroEstado" class="form-label">Filtrar por Estado Productivo</label>
+                    <select class="form-select" id="filtroEstado" onchange="filtrarPlanes()">
+                        <option value="">Todos los estados</option>
+                        <option value="Crecimiento">Crecimiento</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
+                        <option value="Producción">Producción</option>
+                        <option value="Gestación">Gestación</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nombre del Plan</th>
+                            <th>Categoría Animal</th>
+                            <th>Estado Productivo</th>
+                            <th>Descripción</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in planes %}
+                        <tr>
+                            <td>{{ plan.nombre }}</td>
+                            <td>{{ plan.categoria_animal }}</td>
+                            <td>{{ plan.estado_productivo }}</td>
+                            <td>{{ plan.descripcion }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="verDetalles({{ plan.id }})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="editarPlan({{ plan.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarPlan({{ plan.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo plan -->
+<div class="modal fade" id="modalPlan" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Plan de Alimentación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPlan" method="POST" action="{{ url_for('agregar_plan_alimentacion') }}">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Plan</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="categoria_animal" class="form-label">Categoría Animal</label>
+                                <select class="form-select" id="categoria_animal" name="categoria_animal" required>
+                                    <option value="Ternero">Ternero</option>
+                                    <option value="Novillo">Novillo</option>
+                                    <option value="Vaca">Vaca</option>
+                                    <option value="Toro">Toro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="estado_productivo" class="form-label">Estado Productivo</label>
+                                <select class="form-select" id="estado_productivo" name="estado_productivo" required>
+                                    <option value="Crecimiento">Crecimiento</option>
+                                    <option value="Mantenimiento">Mantenimiento</option>
+                                    <option value="Producción">Producción</option>
+                                    <option value="Gestación">Gestación</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Detalles de Alimentación</h6>
+                        <div id="detallesAlimentacion">
+                            <div class="row detalle-item mb-2">
+                                <div class="col-md-4">
+                                    <select class="form-select" name="alimentos[]" required>
+                                        {% for alimento in alimentos %}
+                                            <option value="{{ alimento.id }}">{{ alimento.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="number" step="0.01" class="form-control" name="cantidades[]" placeholder="Cantidad" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control" name="unidades[]" placeholder="Unidad" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="eliminarDetalle(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm mt-2" onclick="agregarDetalle()">
+                            <i class="fas fa-plus"></i> Agregar Alimento
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formPlan" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para ver detalles -->
+<div class="modal fade" id="modalDetalles" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalles del Plan de Alimentación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesPlanContenido">
+                <!-- El contenido se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function filtrarPlanes() {
+    const categoria = document.getElementById('filtroCategoria').value;
+    const estado = document.getElementById('filtroEstado').value;
+    
+    window.location.href = `{{ url_for('planes_alimentacion') }}?categoria=${categoria}&estado=${estado}`;
+}
+
+function agregarDetalle() {
+    const detallesDiv = document.getElementById('detallesAlimentacion');
+    const nuevoDetalle = detallesDiv.children[0].cloneNode(true);
+    nuevoDetalle.querySelectorAll('input').forEach(input => input.value = '');
+    detallesDiv.appendChild(nuevoDetalle);
+}
+
+function eliminarDetalle(btn) {
+    if (document.getElementsByClassName('detalle-item').length > 1) {
+        btn.closest('.detalle-item').remove();
+    }
+}
+
+function verDetalles(id) {
+    fetch(`/detalles_plan_alimentacion/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            const contenido = document.getElementById('detallesPlanContenido');
+            contenido.innerHTML = `
+                <h6>Información General</h6>
+                <p><strong>Nombre:</strong> ${data.nombre}</p>
+                <p><strong>Categoría:</strong> ${data.categoria_animal}</p>
+                <p><strong>Estado:</strong> ${data.estado_productivo}</p>
+                <p><strong>Descripción:</strong> ${data.descripcion}</p>
+                
+                <h6 class="mt-4">Alimentos</h6>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Alimento</th>
+                            <th>Cantidad</th>
+                            <th>Unidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.detalles.map(d => `
+                            <tr>
+                                <td>${d.alimento_nombre}</td>
+                                <td>${d.cantidad_diaria}</td>
+                                <td>${d.unidad_medida}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+        });
+}
+
+function editarPlan(id) {
+    // Implementar lógica de edición
+}
+
+function eliminarPlan(id) {
+    if (confirm('¿Está seguro de que desea eliminar este plan de alimentación?')) {
+        fetch(`/eliminar_plan_alimentacion/${id}`, {
+            method: 'DELETE',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al eliminar el plan');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

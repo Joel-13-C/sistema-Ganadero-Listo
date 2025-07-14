@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Registro de Gastos</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalGasto">
+                <i class="fas fa-plus"></i> Nuevo Gasto
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Gastos Hoy</h5>
+                    <h3 class="card-text">$ {{ total_hoy }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Gastos Mes</h5>
+                    <h3 class="card-text">$ {{ total_mes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Gastos Año</h5>
+                    <h3 class="card-text">$ {{ total_anio }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroFecha" class="form-label">Filtrar por Fecha</label>
+                    <input type="date" class="form-control" id="filtroFecha" onchange="filtrarGastos()">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroCategoria" class="form-label">Filtrar por Categoría</label>
+                    <select class="form-select" id="filtroCategoria" onchange="filtrarGastos()">
+                        <option value="">Todas las categorías</option>
+                        {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Categoría</th>
+                            <th>Descripción</th>
+                            <th>Monto</th>
+                            <th>Comprobante</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gasto in gastos %}
+                        <tr>
+                            <td>{{ gasto.fecha }}</td>
+                            <td>{{ gasto.categoria_nombre }}</td>
+                            <td>{{ gasto.descripcion }}</td>
+                            <td>$ {{ "%.2f"|format(gasto.monto) }}</td>
+                            <td>
+                                {% if gasto.comprobante %}
+                                    <a href="#" class="btn btn-sm btn-outline-primary" onclick="verComprobante('{{ gasto.comprobante }}')">
+                                        <i class="fas fa-file-alt"></i> Ver
+                                    </a>
+                                {% else %}
+                                    <span class="badge bg-secondary">No disponible</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editarGasto('{{ gasto.id }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarGasto('{{ gasto.id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo gasto -->
+<div class="modal fade" id="modalGasto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Gasto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formGasto" method="POST" action="{{ url_for('agregar_gasto') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoria_id" class="form-label">Categoría</label>
+                        <select class="form-select" id="categoria_id" name="categoria_id" required>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="monto" class="form-label">Monto ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="monto" name="monto" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comprobante" class="form-label">Comprobante</label>
+                        <input type="file" class="form-control" id="comprobante" name="comprobante">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formGasto" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// Función para generar las opciones del selector de categorías
+function obtenerOpcionesCategorias(categoriaSeleccionada) {
+    let options = '';
+    
+    // Obtener todas las categorías del selector existente
+    const categoriasSelector = document.getElementById('filtroCategoria');
+    if (categoriasSelector) {
+        const categorias = Array.from(categoriasSelector.options).slice(1); // Excluir la opción "Todas las categorías"
+        
+        categorias.forEach(option => {
+            const selected = option.value == categoriaSeleccionada ? 'selected' : '';
+            options += `<option value="${option.value}" ${selected}>${option.text}</option>`;
+        });
+    }
+    
+    return options;
+}
+
+function filtrarGastos() {
+    const fecha = document.getElementById('filtroFecha').value;
+    const categoria = document.getElementById('filtroCategoria').value;
+    
+    window.location.href = `{{ url_for('gastos') }}?fecha=${fecha}&categoria=${categoria}`;
+}
+
+function editarGasto(id) {
+    // Obtener los datos del gasto
+    fetch(`/gastos/obtener/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const gasto = data.gasto;
+                
+                // Crear un nuevo modal para editar
+                let fechaValue = '';
+                if (gasto.fecha) {
+                    fechaValue = gasto.fecha;
+                }
+                
+                let montoValue = 0;
+                if (gasto.monto) {
+                    montoValue = gasto.monto;
+                }
+                
+                let descripcionValue = '';
+                if (gasto.descripcion) {
+                    descripcionValue = gasto.descripcion;
+                }
+                
+                let comprobanteHtml = '';
+                if (gasto.comprobante) {
+                    comprobanteHtml = `<div class="mt-2"><small>Comprobante actual: <a href="#" onclick="verComprobante('${gasto.comprobante}')">Ver</a></small></div>`;
+                }
+                
+                const modalHTML = `
+                <div class="modal fade" id="modalEditarGasto" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Editar Gasto</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="formEditarGasto" method="POST" action="/gastos/actualizar/${id}" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label for="fecha_editar" class="form-label">Fecha</label>
+                                        <input type="date" class="form-control" id="fecha_editar" name="fecha" value="${fechaValue}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="categoria_id_editar" class="form-label">Categoría</label>
+                                        <select class="form-select" id="categoria_id_editar" name="categoria_id" required>
+                                            ${obtenerOpcionesCategorias(gasto.categoria_id)}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="monto_editar" class="form-label">Monto ($)</label>
+                                        <input type="number" step="0.01" class="form-control" id="monto_editar" name="monto" value="${montoValue}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="descripcion_editar" class="form-label">Descripción</label>
+                                        <textarea class="form-control" id="descripcion_editar" name="descripcion" rows="3">${descripcionValue}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="comprobante_editar" class="form-label">Comprobante</label>
+                                        <input type="file" class="form-control" id="comprobante_editar" name="comprobante">
+                                        ${comprobanteHtml ? `<div class="mt-2"><small>Comprobante actual: <a href="#" class="btn btn-sm btn-outline-primary" onclick="verComprobante('${gasto.comprobante}')"><i class="fas fa-file-alt"></i> Ver comprobante</a></small></div>` : ''}
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" form="formEditarGasto" class="btn btn-primary">Guardar Cambios</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+                
+                // Agregar el modal al DOM
+                const modalContainer = document.createElement('div');
+                modalContainer.innerHTML = modalHTML;
+                document.body.appendChild(modalContainer);
+                
+                // Mostrar el modal
+                const modalElement = document.getElementById('modalEditarGasto');
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+                
+                // Eliminar el modal del DOM cuando se cierre
+                modalElement.addEventListener('hidden.bs.modal', function () {
+                    document.body.removeChild(modalContainer);
+                });
+            } else {
+                alert('Error al cargar los datos del gasto: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar los datos del gasto');
+        });
+}
+
+function eliminarGasto(id) {
+    if (confirm('¿Está seguro de que desea eliminar este gasto?')) {
+        fetch(`/gastos/eliminar/${id}`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Gasto eliminado correctamente');
+                location.reload();
+            } else {
+                alert('Error al eliminar el gasto: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar el gasto');
+        });
+    }
+}
+
+function verComprobante(nombreArchivo) {
+    // Prevenir el comportamiento predeterminado del enlace
+    if (event) {
+        event.preventDefault();
+    }
+    
+    console.log('Nombre de archivo extraído:', nombreArchivo);
+    
+    // Verificar si ya existe el modal, si no, crearlo
+    let modalElement = document.getElementById('modalVerComprobante');
+    if (!modalElement) {
+        // Crear el modal
+        const modalHTML = `
+        <div class="modal fade" id="modalVerComprobante" tabindex="-1" aria-labelledby="modalVerComprobanteLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalVerComprobanteLabel">Comprobante de Gasto</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="comprobanteViewer"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+        
+        // Agregar el modal al DOM
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHTML;
+        document.body.appendChild(modalContainer);
+        
+        modalElement = document.getElementById('modalVerComprobante');
+    }
+    
+    // Preparar el modal
+    const comprobanteViewer = document.getElementById('comprobanteViewer');
+    const comprobanteModal = new bootstrap.Modal(modalElement);
+    
+    // Mostrar indicador de carga
+    comprobanteViewer.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Cargando comprobante...</p></div>';
+    
+    // Mostrar el modal mientras se carga
+    comprobanteModal.show();
+    
+    // Determinar el tipo de archivo para mostrar correctamente
+    const extension = nombreArchivo.split('.').pop().toLowerCase();
+    
+    // Intentar primero con la ruta static/comprobantes
+    const urlComprobante1 = `/static/comprobantes/${encodeURIComponent(nombreArchivo)}`;
+    
+    // Crear una imagen para probar si existe en la primera ruta
+    const img = new Image();
+    img.onload = function() {
+        // La imagen existe en static/comprobantes
+        mostrarContenido(urlComprobante1, extension);
+    };
+    img.onerror = function() {
+        // Intentar con la segunda ruta
+        const urlComprobante2 = `/ver_comprobante/${encodeURIComponent(nombreArchivo)}`;
+        mostrarContenido(urlComprobante2, extension);
+    };
+    img.src = urlComprobante1;
+    
+    // Función para mostrar el contenido según el tipo de archivo
+    function mostrarContenido(url, extension) {
+        if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
+            // Es una imagen
+            comprobanteViewer.innerHTML = `
+                <div class="text-center">
+                    <img src="${url}" class="img-fluid" alt="Comprobante">
+                </div>
+            `;
+        } else if (['pdf'].includes(extension)) {
+            // Es un PDF
+            comprobanteViewer.innerHTML = `
+                <div class="ratio ratio-16x9" style="height: 600px;">
+                    <embed src="${url}" type="application/pdf" width="100%" height="100%" />
+                </div>
+            `;
+        } else {
+            // Otro tipo de archivo
+            comprobanteViewer.innerHTML = `
+                <div class="alert alert-info text-center">
+                    <p>El archivo no se puede previsualizar en el navegador.</p>
+                    <a href="${url}" class="btn btn-primary" target="_blank">
+                        <i class="fas fa-download"></i> Descargar archivo
+                    </a>
+                </div>
+            `;
+        }
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

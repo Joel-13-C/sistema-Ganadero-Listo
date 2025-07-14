@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema Ganadero{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Remix Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animales.css') }}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <h1><i class="fas fa-cow"></i> Sistema Ganadero</h1>
+            </div>
+            <nav>
+                <ul class="nav flex-column">
+                    <!-- Sección Principal -->
+                    <div class="nav-section">Principal</div>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-home"></i> Inicio
+                        </a>
+                    </li>
+
+                    <!-- Sección Ganado -->
+                    <div class="nav-section">Gestión de Ganado</div>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('animales') }}">
+                            <i class="fas fa-cow"></i> Mis Animales
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('registrar_animal') }}">
+                            <i class="fas fa-plus-circle"></i> Registrar Animal
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('pastizales') }}">
+                            <i class="fas fa-seedling"></i> Pastizales
+                        </a>
+                    </li>
+
+                    <!-- Sección Reproducción -->
+                    <div class="nav-section">Reproducción</div>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestacion') }}">
+                            <i class="fas fa-calendar-alt"></i> Gestación
+                        </a>
+                    </li>
+                    <li class="nav-item has-submenu">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-dna"></i> Control Reproductivo
+                        </a>
+                        <ul class="submenu">
+                            <li><a class="nav-link" href="{{ url_for('inseminaciones') }}">
+                                <i class="fas fa-syringe"></i> Inseminaciones
+                            </a></li>
+                            <li><a class="nav-link" href="{{ url_for('genealogia') }}">
+                                <i class="fas fa-sitemap"></i> Genealogía
+                            </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Sección Producción -->
+                    <div class="nav-section">Producción</div>
+                    <li class="nav-item has-submenu">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-milk-jug"></i> Control Lechero
+                        </a>
+                        <ul class="submenu">
+                            <li><a class="nav-link" href="{{ url_for('registro_leche.vista_registro_leche') }}">
+                                <i class="fas fa-clipboard-list"></i> Registro Diario
+                            </a></li>
+                            <li><a class="nav-link" href="{{ url_for('ventas_leche') }}">
+                                <i class="fas fa-cash-register"></i> Ventas
+                            </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Sección Sanidad -->
+                    <div class="nav-section">Sanidad Animal</div>
+                    <li class="nav-item has-submenu">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-heartbeat"></i> Control Sanitario
+                        </a>
+                        <ul class="submenu">
+                            <li><a class="nav-link" href="{{ url_for('vacunas') }}">
+                                <i class="fas fa-syringe"></i> Vacunación
+                            </a></li>
+                            <li><a class="nav-link" href="{{ url_for('desparasitacion') }}">
+                                <i class="fas fa-shield-virus"></i> Desparasitación
+                            </a></li>
+                            <li><a class="nav-link" href="{{ url_for('vitaminizacion') }}">
+                                <i class="fas fa-pills"></i> Vitaminización
+                            </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Sección Finanzas -->
+                    <div class="nav-section">Finanzas</div>
+                    <li class="nav-item has-submenu">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-dollar-sign"></i> Control Financiero
+                        </a>
+                        <ul class="submenu">
+                            <li><a class="nav-link" href="{{ url_for('gastos') }}">
+                                <i class="fas fa-money-bill-wave"></i> Gastos
+                            </a></li>
+                            <li><a class="nav-link" href="{{ url_for('ingresos') }}">
+                                <i class="fas fa-money-bill-wave"></i> Ingresos
+                            </a></li>
+                            <li><a class="nav-link" href="{{ url_for('reportes_financieros') }}">
+                                <i class="fas fa-chart-pie"></i> Reportes
+                            </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Sección Sistema -->
+                    <div class="nav-section">Sistema</div>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('editar_perfil') }}">
+                            <i class="fas fa-user-edit"></i> Perfil
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('configuracion_alarmas') }}">
+                            <i class="fas fa-bell"></i> Alarmas y Notificaciones
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-danger" href="{{ url_for('login') }}">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Custom JavaScript para el menú -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Manejo de submenús
+            const menuItems = document.querySelectorAll('.has-submenu > .nav-link');
+            menuItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const parent = this.parentElement;
+                    const submenu = parent.querySelector('.submenu');
+                    
+                    // Cerrar otros submenús
+                    document.querySelectorAll('.submenu.show').forEach(menu => {
+                        if (menu !== submenu) {
+                            menu.classList.remove('show');
+                            menu.parentElement.classList.remove('open');
+                        }
+                    });
+                    
+                    // Alternar el submenú actual
+                    submenu.classList.toggle('show');
+                    parent.classList.toggle('open');
+                });
+            });
+
+            // Marcar el enlace activo
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                    // Si está en un submenú, mostrar el submenú padre
+                    const parentSubmenu = link.closest('.submenu');
+                    if (parentSubmenu) {
+                        parentSubmenu.classList.add('show');
+                        parentSubmenu.parentElement.classList.add('open');
+                    }
+                }
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

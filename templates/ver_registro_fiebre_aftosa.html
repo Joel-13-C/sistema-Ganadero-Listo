@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalles de Vacunación - Fiebre Aftosa{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Detalles de Vacunación - Fiebre Aftosa</h2>
+        <a href="{{ url_for('fiebre_aftosa') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <!-- Información del Certificado -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Información del Certificado</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Fecha de Registro:</strong><br>
+                        {{ registro.fecha_registro.strftime('%d/%m/%Y') }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Número de Certificado:</strong><br>
+                        {{ registro.numero_certificado }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Próxima Aplicación:</strong><br>
+                        {{ registro.fecha_proxima_aplicacion.strftime('%d/%m/%Y') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del Propietario y Predio -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Información del Propietario y Predio</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Nombre del Propietario:</strong><br>
+                        {{ registro.nombre_propietario }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>C.C. / R.U.C.:</strong><br>
+                        {{ registro.identificacion }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Nombre del Predio:</strong><br>
+                        {{ registro.nombre_predio }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ubicación -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Ubicación del Predio</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Provincia:</strong><br>
+                        {{ registro.provincia }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Cantón:</strong><br>
+                        {{ registro.canton }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Parroquia:</strong><br>
+                        {{ registro.parroquia }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información de la Explotación -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Información de la Explotación</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Tipo de Explotación:</strong> {{ registro.tipo_explotacion }}</p>
+        </div>
+    </div>
+
+    <!-- Información del Vacunador -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Información del Vacunador</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Nombre del Vacunador:</strong><br>
+                        {{ registro.nombre_vacunador }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Cédula del Vacunador:</strong><br>
+                        {{ registro.cedula_vacunador }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Animales -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Animales Vacunados</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Arete</th>
+                            <th>Nombre</th>
+                            <th>Condición</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for animal in animales %}
+                        <tr>
+                            <td>{{ animal.numero_arete }}</td>
+                            <td>{{ animal.nombre }}</td>
+                            <td>{{ animal.condicion }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

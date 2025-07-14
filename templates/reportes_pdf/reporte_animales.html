@@ -1,0 +1,40 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block contenido %}
+<h2>Listado de Animales</h2>
+
+<div class="resumen">
+    <p>Total de animales: <span class="total">{{ animales|length }}</span></p>
+    <p>Machos: {{ total_machos }} | Hembras: {{ total_hembras }}</p>
+    <p>Valor total estimado: ${{ valor_total|round(2) }}</p>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nombre/Arete</th>
+            <th>Categoría</th>
+            <th>Raza</th>
+            <th>Sexo</th>
+            <th>Fecha Nacimiento</th>
+            <th>Peso (kg)</th>
+            <th>Estado</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for animal in animales %}
+        <tr>
+            <td>{{ animal.id }}</td>
+            <td>{{ animal.nombre_arete }}</td>
+            <td>{{ animal.categoria }}</td>
+            <td>{{ animal.raza }}</td>
+            <td>{{ animal.sexo }}</td>
+            <td>{{ animal.fecha_nacimiento }}</td>
+            <td>{{ animal.peso }}</td>
+            <td>{{ animal.estado }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

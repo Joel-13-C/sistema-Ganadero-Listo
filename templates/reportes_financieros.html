@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Reportes Financieros - {{ año_actual }}</h2>
+    
+    <!-- Formulario de filtrado -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('reportes_financieros') }}" class="row g-3">
+                <div class="col-md-5">
+                    <label for="anio" class="form-label">Año</label>
+                    <select class="form-select" id="anio" name="anio">
+                        {% for anio in range(2020, (año_actual + 1))|reverse %}
+                            <option value="{{ anio }}" {% if anio == año_actual %}selected{% endif %}>{{ anio }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label for="mes" class="form-label">Mes</label>
+                    <select class="form-select" id="mes" name="mes">
+                        <option value="1" {% if mes_actual == 1 %}selected{% endif %}>Enero</option>
+                        <option value="2" {% if mes_actual == 2 %}selected{% endif %}>Febrero</option>
+                        <option value="3" {% if mes_actual == 3 %}selected{% endif %}>Marzo</option>
+                        <option value="4" {% if mes_actual == 4 %}selected{% endif %}>Abril</option>
+                        <option value="5" {% if mes_actual == 5 %}selected{% endif %}>Mayo</option>
+                        <option value="6" {% if mes_actual == 6 %}selected{% endif %}>Junio</option>
+                        <option value="7" {% if mes_actual == 7 %}selected{% endif %}>Julio</option>
+                        <option value="8" {% if mes_actual == 8 %}selected{% endif %}>Agosto</option>
+                        <option value="9" {% if mes_actual == 9 %}selected{% endif %}>Septiembre</option>
+                        <option value="10" {% if mes_actual == 10 %}selected{% endif %}>Octubre</option>
+                        <option value="11" {% if mes_actual == 11 %}selected{% endif %}>Noviembre</option>
+                        <option value="12" {% if mes_actual == 12 %}selected{% endif %}>Diciembre</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+                <div class="col-md-12 mt-3 d-flex justify-content-end">
+                    <a href="{{ url_for('descargar_reporte_pdf', anio=año_actual, mes=mes_actual) }}" class="btn btn-success">
+                        <i class="fas fa-file-pdf"></i> Descargar Reporte PDF
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Resumen General -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Ingresos</h5>
+                    <h3 class="card-text">$ {{ total_ingresos_anual }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Gastos</h5>
+                    <h3 class="card-text">$ {{ total_gastos_anual }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card {% if balance_anual|float >= 0 %}bg-info{% else %}bg-warning{% endif %} text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Balance Anual</h5>
+                    <h3 class="card-text">$ {{ balance_anual }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    <!-- Distribución por Categorías -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Ingresos por Categoría - {{ nombre_mes_actual }} {{ año_actual }}</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Categoría</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ingreso in ingresos_por_categoria %}
+                                <tr>
+                                    <td>{{ ingreso.categoria }}</td>
+                                    <td>$ {{ "%.2f"|format(ingreso.total|float) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Gastos por Categoría - {{ nombre_mes_actual }} {{ año_actual }}</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Categoría</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for gasto in gastos_por_categoria %}
+                                <tr>
+                                    <td>{{ gasto.categoria }}</td>
+                                    <td>$ {{ "%.2f"|format(gasto.total|float) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Scripts adicionales pueden agregarse aquí si es necesario -->
+{% endblock %}

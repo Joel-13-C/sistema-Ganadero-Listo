@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema Ganadero - Login</title>
+    <link rel="stylesheet" href="/static/css/login.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url("/static/images/GANADO-LOGIN-2.jpg");
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-align: center;
+            background-attachment: fixed;
+        }
+
+        .btn-sidebar {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-sidebar:hover {
+            background-color: #3e8e41;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-form">
+            <div class="form-content">
+                <div class="logo-container">
+                    <img src="/static/images/logo.png" alt="Logo Sistema Ganadero">
+                </div>
+                <h2>Iniciar Sesión</h2>
+                
+                    
+                        
+                            <div class="alert alert-error">Por favor inicia sesión para acceder a esta página</div>
+                        
+                    
+                
+                <form method="POST" action="/autenticar">
+                    <div class="input-group">
+                        <input type="text" name="username" required>
+                        <label>Usuario</label>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" name="password" required>
+                        <label>Contraseña</label>
+                    </div>
+                    <button type="submit" class="btn-login">Iniciar Sesión</button>
+                </form>
+            </div>
+        </div>
+        <div class="login-sidebar">
+            <h3>Bienvenido</h3>
+            <p>Accede a tu sistema de gestión ganadera</p>
+            <div class="sidebar-links">
+                <a href="/registro" class="btn-sidebar">Registrarse</a>
+                <a href="/recuperar-contrasena" class="btn-sidebar">Recuperar Contraseña</a>
+                <a href="/" class="btn-sidebar">Volver al Inicio</a>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/login.js"></script>
+</body>
+</html>

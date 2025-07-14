@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema Ganadero - Recuperar Contraseña</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url("{{ url_for('static', filename='images/GANADO-LOGIN-2.jpg') }}");
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-align: center;
+            background-attachment: fixed;
+        }
+
+        .btn-sidebar {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-sidebar:hover {
+            background-color: #3e8e41;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-form">
+            <div class="form-content">
+                <h2>Recuperar Contraseña</h2>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                <form action="{{ url_for('recuperar_contrasena') }}" method="POST">
+                    <div class="input-group">
+                        <input type="email" name="email" required>
+                        <label>Correo Electrónico</label>
+                    </div>
+                    <button type="submit" class="btn-login">Recuperar Contraseña</button>
+                </form>
+            </div>
+        </div>
+        <div class="login-sidebar">
+            <h3>Recuperación de Contraseña</h3>
+            <p>Ingresa tu correo electrónico para recuperar tu contraseña</p>
+            <div class="sidebar-links">
+                <a href="{{ url_for('login') }}" class="btn-sidebar">Iniciar Sesión</a>
+                <a href="{{ url_for('registro') }}" class="btn-sidebar">Registrarse</a>
+                <a href="{{ url_for('inicio') }}" class="btn-sidebar">Volver al Inicio</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

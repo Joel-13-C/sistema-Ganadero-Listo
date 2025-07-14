@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="animales-container">
+    <div class="animales-header">
+        <h2><i class="fas fa-cow"></i> Mis Animales</h2>
+        <div class="header-actions">
+            <a href="{{ url_for('registrar_animal') }}" class="btn btn-add-animal">
+                <i class="fas fa-plus-circle"></i> Registrar Nuevo Animal
+            </a>
+            <a href="{{ url_for('generar_qr') }}" class="btn btn-add-animal">
+                <i class="ri-qr-code-line"></i> Generar Código QR
+            </a>
+            <div class="dropdown">
+                <button class="btn btn-add-animal dropdown-toggle" type="button" id="reportesPdfBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-file-pdf"></i> Generar Reporte PDF
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="reportesPdfBtn">
+                    <li><a class="dropdown-item" href="{{ url_for('generar_reporte_pdf', tipo='todos') }}">Todos los Animales</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('generar_reporte_pdf', tipo='toros') }}">Solo Toros</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('generar_reporte_pdf', tipo='vacas') }}">Solo Vacas</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('generar_reporte_pdf', tipo='terneros') }}">Solo Terneros</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('generar_reporte_pdf', tipo='vaconas') }}">Solo Vaconas</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="animales-filters">
+        <div class="animal-search">
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" id="searchInput" class="form-control" placeholder="Buscar animal por nombre, arete o raza...">
+            </div>
+        </div>
+        <div class="animal-filters-advanced">
+            <select id="breedFilter" class="form-control">
+                <option value="">Todas las Razas</option>
+                <option value="Holstein">Holstein</option>
+                <option value="Angus">Angus</option>
+                <option value="Hereford">Hereford</option>
+                <option value="Jersey">Jersey</option>
+                <option value="Otra">Otra</option>
+            </select>
+            <select id="sexFilter" class="form-control">
+                <option value="">Todos los Sexos</option>
+                <option value="Macho">Macho</option>
+                <option value="Hembra">Hembra</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="animales-stats mb-4">
+        <div class="row g-3">
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card bg-primary text-white">
+                    <div class="stat-icon"><i class="fas fa-cow"></i></div>
+                    <div class="stat-info">
+                        <h3>{{ animales|length }}</h3>
+                        <p>Total de Animales</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card bg-success text-white">
+                    <div class="stat-icon"><i class="fas fa-venus"></i></div>
+                    <div class="stat-info">
+                        <h3>{{ animales|selectattr('sexo', 'equalto', 'Hembra')|list|length }}</h3>
+                        <p>Hembras</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card bg-info text-white">
+                    <div class="stat-icon"><i class="fas fa-mars"></i></div>
+                    <div class="stat-info">
+                        <h3>{{ animales|selectattr('sexo', 'equalto', 'Macho')|list|length }}</h3>
+                        <p>Machos</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card bg-warning text-white">
+                    <div class="stat-icon"><i class="fas fa-calendar"></i></div>
+                    <div class="stat-info">
+                        <h3>{{ animales|selectattr('condicion', 'equalto', 'Ternero')|list|length + animales|selectattr('condicion', 'equalto', 'Ternera')|list|length }}</h3>
+                        <p>Terneros</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="animalesContainer" class="animal-card-container">
+        {% if animales %}
+            {% for animal in animales %}
+            <div class="animal-card-wrapper" 
+                 data-nombre="{{ animal.nombre }}" 
+                 data-arete="{{ animal.numero_arete }}" 
+                 data-raza="{{ animal.raza }}"
+                 data-sexo="{{ animal.sexo }}">
+                <div class="card animal-card">
+                    <div class="card-badge {% if animal.condicion in ['Toro', 'Torete'] %}badge-primary{% elif animal.condicion in ['Vaca', 'Vacona'] %}badge-success{% else %}badge-warning{% endif %}">{{ animal.condicion }}</div>
+                    <img src="{{ animal.foto_path if animal.foto_path.startswith('/static/') or animal.foto_path.startswith('static/') else '/' + animal.foto_path }}" 
+                         class="card-img-top" 
+                         alt="{{ animal.nombre }}"
+                         onerror="this.src='/static/images/upload-image-placeholder.svg'">
+                    <div class="card-body">
+                        <div class="card-title">
+                            <h5>{{ animal.nombre }}</h5>
+                            <span class="badge {% if animal.sexo == 'Macho' %}bg-primary{% else %}bg-success{% endif %}">
+                                {{ animal.sexo }}
+                            </span>
+                        </div>
+                        <p class="card-text">
+                            <strong>Arete:</strong> {{ animal.numero_arete }}<br>
+                            <strong>Raza:</strong> {{ animal.raza }}<br>
+                            <strong>Condición:</strong> {{ animal.condicion }}
+                            {% if animal.fecha_nacimiento %}
+                            <br><strong>Edad:</strong> {{ ((now - animal.fecha_nacimiento).days // 365) }} años, {{ ((now - animal.fecha_nacimiento).days % 365) // 30 }} meses
+                            {% endif %}
+                        </p>
+                        <div class="animal-actions">
+                            <a href="{{ url_for('editar_animal', animal_id=animal.id) }}" class="btn btn-info">
+                                <i class="fas fa-edit"></i> Editar
+                            </a>
+                            <button class="btn btn-danger btn-eliminar-animal" data-id="{{ animal.id }}">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="col-12">
+            <div class="no-animals">
+                <img src="{{ url_for('static', filename='images/empty-state.svg') }}" alt="Sin animales">
+                <h3>Aún no tienes animales registrados</h3>
+                <p>Comienza registrando tu primer animal haciendo clic en "Registrar Nuevo Animal"</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="noResultsMessage" class="no-animals" style="display: none;">
+        <img src="{{ url_for('static', filename='images/no-results.svg') }}" alt="Sin resultados">
+        <h3>No se encontraron animales</h3>
+        <p>Prueba con otros términos de búsqueda</p>
+    </div>
+</div>
+
+<!-- Agregar estilos adicionales -->
+<style>
+    .stat-card {
+        border-radius: 12px;
+        padding: 1.2rem;
+        display: flex;
+        align-items: center;
+        box-shadow: var(--shadow-subtle);
+        transition: var(--transition-smooth);
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-medium);
+    }
+    
+    .stat-icon {
+        font-size: 2.5rem;
+        margin-right: 1rem;
+        opacity: 0.8;
+    }
+    
+    .stat-info h3 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .stat-info p {
+        margin: 0;
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .card-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: white;
+        z-index: 2;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+    
+    .badge-primary {
+        background-color: var(--color-primary);
+    }
+    
+    .badge-success {
+        background-color: var(--color-accent);
+    }
+    
+    .badge-warning {
+        background-color: var(--color-warning);
+    }
+</style>
+
+<!-- Reemplazar el script original por el mejorado -->
+<script src="{{ url_for('static', filename='js/animales_mejorado.js') }}"></script>
+{% endblock %}

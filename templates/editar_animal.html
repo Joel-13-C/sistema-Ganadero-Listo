@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .animal-container {
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background: linear-gradient(145deg, #ffffff, #f5f7fa);
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .animal-header {
+        position: relative;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #e6e9ef;
+    }
+
+    .animal-header h2 {
+        font-size: 1.8rem;
+        color: #2c3e50;
+        font-weight: 600;
+        margin: 0;
+        text-align: center;
+    }
+
+    .back-link {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .back-link:hover {
+        color: #007bff;
+        transform: translateY(-50%) translateX(-3px);
+    }
+
+    .animal-photo {
+        width: 220px;
+        height: 220px;
+        border-radius: 15px;
+        object-fit: cover;
+        margin-bottom: 1.5rem;
+        border: 4px solid #007bff;
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.2);
+        transition: all 0.3s ease;
+    }
+
+    .animal-photo:hover {
+        transform: scale(1.02);
+        box-shadow: 0 12px 30px rgba(0, 123, 255, 0.3);
+    }
+
+    .photo-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 2.5rem;
+        padding: 2rem;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .upload-photo-btn {
+        position: relative;
+        overflow: hidden;
+        margin: 1rem 0;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(45deg, #007bff, #00a0ff);
+        border: none;
+        border-radius: 10px;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .upload-photo-btn:hover {
+        background: linear-gradient(45deg, #0056b3, #007bff);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+    }
+
+    .upload-photo-btn input[type="file"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .photo-info {
+        margin-top: 1rem;
+        text-align: center;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    .photo-info p {
+        margin: 0.3rem 0;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .input-wrapper {
+        position: relative;
+        background: white;
+        border: 2px solid #e6e9ef;
+        border-radius: 12px;
+        padding: 0.3rem;
+        transition: all 0.3s ease;
+    }
+
+    .input-wrapper:focus-within {
+        border-color: #007bff;
+        box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.1);
+    }
+
+    .input-wrapper i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #007bff;
+        font-size: 1.2rem;
+    }
+
+    .input-wrapper input,
+    .input-wrapper select {
+        width: 100%;
+        padding: 0.8rem 1rem 0.8rem 2.8rem;
+        border: none;
+        background: transparent;
+        color: #2c3e50;
+        font-size: 1rem;
+        outline: none;
+    }
+
+    .input-wrapper select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23007bff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        background-size: 1.2rem;
+        padding-right: 3rem;
+    }
+
+    .form-actions {
+        margin-top: 2.5rem;
+        text-align: center;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 15px;
+    }
+
+    .btn-primary {
+        padding: 0.8rem 2rem;
+        font-weight: 500;
+        background: linear-gradient(45deg, #007bff, #00a0ff);
+        border: none;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(45deg, #0056b3, #007bff);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+    }
+
+    .btn-secondary {
+        padding: 0.8rem 2rem;
+        font-weight: 500;
+        background: #6c757d;
+        border: none;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        margin-left: 1rem;
+    }
+
+    .btn-secondary:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+    }
+
+    @media (max-width: 768px) {
+        .animal-container {
+            margin: 1rem;
+            padding: 1.5rem;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .animal-header h2 {
+            font-size: 1.5rem;
+            padding: 0 2rem;
+        }
+
+        .form-actions {
+            padding: 1rem 0;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            display: block;
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+    }
+
+    /* Animaciones */
+    @keyframes fadeIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(20px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+    }
+
+    .animal-container {
+        animation: fadeIn 0.5s ease-out;
+    }
+
+    .form-group {
+        opacity: 0;
+        animation: fadeIn 0.5s ease-out forwards;
+    }
+
+    .form-group:nth-child(1) { animation-delay: 0.1s; }
+    .form-group:nth-child(2) { animation-delay: 0.2s; }
+    .form-group:nth-child(3) { animation-delay: 0.3s; }
+    .form-group:nth-child(4) { animation-delay: 0.4s; }
+    .form-group:nth-child(5) { animation-delay: 0.5s; }
+    .form-group:nth-child(6) { animation-delay: 0.6s; }
+    .form-group:nth-child(7) { animation-delay: 0.7s; }
+    .form-group:nth-child(8) { animation-delay: 0.8s; }
+    .form-group:nth-child(9) { animation-delay: 0.9s; }
+    .form-group:nth-child(10) { animation-delay: 1s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="animal-container">
+        <div class="animal-header">
+            <a href="{{ url_for('animales') }}" class="back-link">
+                <i class="ri-arrow-left-line"></i>
+            </a>
+            <h2>Editar Información del Animal</h2>
+        </div>
+
+        {% if animal %}
+        <form id="editarAnimalForm" action="{{ url_for('editar_animal', animal_id=animal.id) }}" method="POST" enctype="multipart/form-data">
+            <div class="photo-container">
+                <img id="previewImage" 
+                     src="{{ animal.foto_path }}" 
+                     class="animal-photo" 
+                     alt="Vista previa de la foto"
+                     onerror="this.src='/static/images/upload-image-placeholder.svg'">
+                
+                <div class="upload-photo-btn">
+                    <i class="ri-camera-line me-2"></i>
+                    Cambiar Foto
+                    <input type="file" name="foto" id="fotoInput" 
+                           accept="image/*" 
+                           onchange="previewImage(this)">
+                </div>
+                
+                <div class="photo-info">
+                    <p><i class="ri-image-line me-1"></i> Formatos permitidos: JPG, PNG</p>
+                    <p><i class="ri-file-list-line me-1"></i> Tamaño máximo: 5MB</p>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="nombre">Nombre del Animal</label>
+                    <div class="input-wrapper">
+                        <i class="ri-text"></i>
+                        <input type="text" id="nombre" name="nombre" value="{{ animal.nombre }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="numero_arete">Número de Arete</label>
+                    <div class="input-wrapper">
+                        <i class="ri-id-badge-line"></i>
+                        <input type="text" id="numero_arete" name="numero_arete" value="{{ animal.numero_arete }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="fecha_nacimiento">Fecha de Nacimiento</label>
+                    <div class="input-wrapper">
+                        <i class="ri-calendar-line"></i>
+                        <input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ animal.fecha_nacimiento }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="raza">Raza</label>
+                    <div class="input-wrapper">
+                        <i class="ri-list-check"></i>
+                        <select id="raza" name="raza" required>
+                            <option value="">Seleccionar Raza</option>
+                            <option value="Holstein" {% if animal.raza == 'Holstein' %}selected{% endif %}>Holstein</option>
+                            <option value="Angus" {% if animal.raza == 'Angus' %}selected{% endif %}>Angus</option>
+                            <option value="Hereford" {% if animal.raza == 'Hereford' %}selected{% endif %}>Hereford</option>
+                            <option value="Jersey" {% if animal.raza == 'Jersey' %}selected{% endif %}>Jersey</option>
+                            <option value="Otra" {% if animal.raza not in ['Holstein', 'Angus', 'Hereford', 'Jersey'] %}selected{% endif %}>Otra</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="sexo">Sexo</label>
+                    <div class="input-wrapper">
+                        <i class="ri-user-line"></i>
+                        <select id="sexo" name="sexo" required>
+                            <option value="">Seleccionar Sexo</option>
+                            <option value="Macho" {% if animal.sexo == 'Macho' %}selected{% endif %}>Macho</option>
+                            <option value="Hembra" {% if animal.sexo == 'Hembra' %}selected{% endif %}>Hembra</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="condicion">Condición</label>
+                    <div class="input-wrapper">
+                        <i class="ri-heartbeat-line"></i>
+                        <select id="condicion" name="condicion" required>
+                            <option value="">Seleccionar</option>
+                            <option value="Toro" {% if animal.condicion == 'Toro' %}selected{% endif %}>Toro</option>
+                            <option value="Torete" {% if animal.condicion == 'Torete' %}selected{% endif %}>Torete</option>
+                            <option value="Vaca" {% if animal.condicion == 'Vaca' %}selected{% endif %}>Vaca</option>
+                            <option value="Vacona" {% if animal.condicion == 'Vacona' %}selected{% endif %}>Vacona</option>
+                            <option value="Ternero" {% if animal.condicion == 'Ternero' %}selected{% endif %}>Ternero</option>
+                            <option value="Ternera" {% if animal.condicion == 'Ternera' %}selected{% endif %}>Ternera</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="propietario">Propietario</label>
+                    <div class="input-wrapper">
+                        <i class="ri-user-line"></i>
+                        <input type="text" id="propietario" name="propietario" value="{{ animal.propietario }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="padre_arete">Arete del Padre (Opcional)</label>
+                    <div class="input-wrapper">
+                        <i class="ri-id-badge-line"></i>
+                        <input type="text" id="padre_arete" name="padre_arete" value="{{ animal.padre_arete }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="madre_arete">Arete de la Madre (Opcional)</label>
+                    <div class="input-wrapper">
+                        <i class="ri-id-badge-line"></i>
+                        <input type="text" id="madre_arete" name="madre_arete" value="{{ animal.madre_arete }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="ri-save-line me-2"></i>
+                    Guardar Cambios
+                </button>
+                <a href="{{ url_for('animales') }}" class="btn btn-secondary">
+                    <i class="ri-close-line me-2"></i>
+                    Cancelar
+                </a>
+            </div>
+        </form>
+        {% else %}
+        <div class="alert alert-danger" role="alert">
+            <i class="ri-error-warning-line me-2"></i>
+            No se encontró el animal solicitado. Puede que haya sido eliminado o no tenga permisos para editarlo.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script>
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImage').src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('editarAnimalForm');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Animal Actualizado',
+                        text: 'La información del animal se ha actualizado correctamente.',
+                        confirmButtonText: 'Aceptar'
+                    }).then(() => {
+                        window.location.href = "{{ url_for('animales') }}";
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: data.message || 'Hubo un problema al actualizar el animal.',
+                        confirmButtonText: 'Aceptar'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de Conexión',
+                    text: 'No se pudo conectar con el servidor.',
+                    confirmButtonText: 'Aceptar'
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

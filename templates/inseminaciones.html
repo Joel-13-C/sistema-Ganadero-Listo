@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+
+{% block title %}Inseminaciones{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inseminacion.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Registro de Inseminación</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('registrar_inseminacion') }}" method="POST">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="animal_id" class="form-label">Animal</label>
+                                    <select class="form-select" id="animal_id" name="animal_id" required>
+                                        <option value="">Seleccione un animal</option>
+                                        {% for animal in animales %}
+                                        <option value="{{ animal.id }}">{{ animal.numero_arete }} - {{ animal.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="fecha_inseminacion" class="form-label">Fecha de Inseminación</label>
+                                    <input type="date" class="form-control" id="fecha_inseminacion" name="fecha_inseminacion" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="tipo_inseminacion" class="form-label">Tipo</label>
+                                    <select class="form-select" id="tipo_inseminacion" name="tipo_inseminacion" required>
+                                        <option value="">Seleccione tipo</option>
+                                        <option value="Artificial">Artificial</option>
+                                        <option value="Natural">Natural</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="semental" class="form-label">Semental/Pajuela</label>
+                                    <input type="text" class="form-control" id="semental" name="semental" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="raza_semental" class="form-label">Raza del Semental</label>
+                                    <input type="text" class="form-control" id="raza_semental" name="raza_semental">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="codigo_pajuela" class="form-label">Código de Pajuela</label>
+                                    <input type="text" class="form-control" id="codigo_pajuela" name="codigo_pajuela">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="inseminador" class="form-label">Inseminador</label>
+                                    <input type="text" class="form-control" id="inseminador" name="inseminador">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="observaciones" class="form-label">Observaciones</label>
+                                    <textarea class="form-control" id="observaciones" name="observaciones" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">Registrar Inseminación</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabla de inseminaciones -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Inseminaciones Registradas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-inseminacion">
+                            <thead>
+                                <tr>
+                                    <th>Animal</th>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Semental/Pajuela</th>
+                                    <th>Raza</th>
+                                    <th>Código</th>
+                                    <th>Inseminador</th>
+                                    <th>Estado</th>
+                                    <th>Observaciones</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i in inseminaciones %}
+                                <tr>
+                                    <td>{{ i.numero_arete }} - {{ i.nombre_animal }}</td>
+                                    <td>{{ i.fecha_inseminacion }}</td>
+                                    <td>{{ i.tipo_inseminacion }}</td>
+                                    <td>{{ i.semental }}</td>
+                                    <td><strong>{{ i.raza_semental }}</strong></td>
+                                    <td><strong>{{ i.codigo_pajuela }}</strong></td>
+                                    <td><strong>{{ i.inseminador }}</strong></td>
+                                    <td>
+                                        <span class="badge {% if i.exitosa == None %}bg-warning{% elif i.exitosa %}bg-success{% else %}bg-danger{% endif %}">
+                                            {% if i.exitosa == None %}Pendiente{% elif i.exitosa %}Exitosa{% else %}Fallida{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>{{ i.observaciones }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            {% if i.exitosa == None %}
+                                            <button type="button" class="btn btn-sm btn-success" onclick="actualizarEstadoInseminacion('{{ i.id }}', true)">
+                                                <i class="fas fa-check"></i> Exitosa
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="actualizarEstadoInseminacion('{{ i.id }}', false)">
+                                                <i class="fas fa-times"></i> Fallida
+                                            </button>
+                                            {% endif %}
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmarEliminarInseminacion('{{ i.id }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para actualizar el estado de inseminación y eliminar inseminaciones -->
+<script>
+    function actualizarEstadoInseminacion(inseminacionId, exitosa) {
+        fetch('/actualizar_estado_inseminacion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                inseminacion_id: inseminacionId,
+                exitosa: exitosa
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    title: 'Estado actualizado',
+                    text: data.message,
+                    icon: 'success'
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({
+                    title: 'Error',
+                    text: data.message,
+                    icon: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Error al actualizar el estado',
+                icon: 'error'
+            });
+        });
+    }
+    
+    function confirmarEliminarInseminacion(inseminacionId) {
+        Swal.fire({
+            title: '¿Está seguro?',
+            text: 'Esta acción eliminará permanentemente el registro de inseminación',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                eliminarInseminacion(inseminacionId);
+            }
+        });
+    }
+    
+    function eliminarInseminacion(inseminacionId) {
+        fetch('/eliminar_inseminacion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                inseminacion_id: inseminacionId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    title: 'Eliminado',
+                    text: 'El registro ha sido eliminado correctamente',
+                    icon: 'success'
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({
+                    title: 'Error',
+                    text: data.message || 'Error al eliminar el registro',
+                    icon: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Error al eliminar el registro',
+                icon: 'error'
+            });
+        });
+    }
+</script>
+
+<!-- Script de depuración para verificar los datos de inseminaciones -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var inseminacionesData = {{ inseminaciones|tojson|safe }};
+        console.log('Datos de inseminaciones recibidos:', inseminacionesData);
+        
+        // Verificar si la tabla se está renderizando correctamente
+        var tabla = document.querySelector('.table-inseminacion');
+        if (tabla) {
+            console.log('Tabla encontrada con clase table-inseminacion');
+            console.log('Número de filas en la tabla:', tabla.querySelectorAll('tbody tr').length);
+        } else {
+            console.log('Error: No se encontró la tabla con clase table-inseminacion');
+        }
+    });
+</script>
+{% endblock %}

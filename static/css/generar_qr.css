@@ -1,0 +1,173 @@
+body {
+    background-image: url('../images/OIP\ \(1\).jpg'); /* Ruta a la imagen */
+    background-size: cover; /* Ajustar la imagen al contenedor */
+    background-position: center; /* Centrar la imagen */
+    margin: 0;
+    height: 100vh; /* Altura completa de la ventana */
+}
+
+.qr-container {
+    position: relative; /* Para que los elementos hijos se posicionen en relación a este contenedor */
+    max-width: 800px;
+    margin: 20px auto; /* Centrar el contenedor */
+    padding: 20px;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.8); /* Fondo blanco semi-transparente */
+    border-radius: 10px; /* Bordes redondeados */
+}
+
+.qr-form {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.qr-form input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.qr-form button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.qr-form button:hover {
+    background-color: #0056b3;
+}
+
+.qr-result {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f4f4f4;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.qr-image {
+    max-width: 300px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.datos-qr {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 15px;
+    text-align: left;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.navbar {
+    background-color: rgba(255, 255, 255, 0.9); /* Fondo blanco semi-transparente */
+    padding: 10px 20px;
+    position: absolute; /* Fijar el menú en la parte superior */
+    width: 100%;
+    z-index: 1; /* Asegurarse de que esté por encima del contenido */
+}
+
+.navbar ul {
+    list-style-type: none; /* Sin viñetas */
+    margin: 0;
+    padding: 0;
+    display: flex; /* Mostrar los elementos en línea */
+    justify-content: space-around; /* Espaciado uniforme */
+}
+
+.navbar li {
+    margin-right: 20px; /* Espaciado entre los elementos */
+}
+
+.navbar a {
+    text-decoration: none; /* Sin subrayado */
+    color: #007bff; /* Color del texto */
+    font-weight: bold;
+    padding: 10px 15px; /* Espaciado interno para botones */
+    border-radius: 5px; /* Bordes redondeados */
+    transition: background-color 0.3s; /* Transición suave */
+}
+
+.navbar a:hover {
+    background-color: rgba(0, 123, 255, 0.1); /* Fondo al pasar el mouse */
+    color: #0056b3; /* Color del texto al pasar el mouse */
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printableArea, #printableArea * {
+        visibility: visible;
+    }
+    #printableArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+.btn-back {
+    margin-left: 10px; /* Espaciado a la izquierda */
+}
+
+.btn-danger {
+    background-color: #dc3545; /* Color de fondo rojo */
+    color: white; /* Color del texto blanco */
+}
+
+.btn-danger:hover {
+    background-color: #c82333; /* Color de fondo más oscuro al pasar el mouse */
+}
+
+.navbar a {
+    text-decoration: none; /* Sin subrayado */
+    color: #007bff; /* Color del texto */
+    font-weight: bold;
+    padding: 10px 15px; /* Espaciado interno para botones */
+    border-radius: 5px; /* Bordes redondeados */
+    transition: background-color 0.3s; /* Transición suave */
+}
+
+.navbar a:hover {
+    background-color: rgba(0, 123, 255, 0.1); /* Fondo al pasar el mouse */
+    color: #0056b3; /* Color del texto al pasar el mouse */
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printableArea, #printableArea * {
+        visibility: visible;
+    }
+    #printableArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+}

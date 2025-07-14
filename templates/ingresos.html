@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Registro de Ingresos</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalIngreso">
+                <i class="fas fa-plus"></i> Nuevo Ingreso
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Ingresos Hoy</h5>
+                    <h3 class="card-text">$ {{ total_hoy }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Ingresos Mes</h5>
+                    <h3 class="card-text">$ {{ total_mes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Ingresos Año</h5>
+                    <h3 class="card-text">$ {{ total_anio }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroFecha" class="form-label">Filtrar por Fecha</label>
+                    <input type="date" class="form-control" id="filtroFecha" onchange="filtrarIngresos()">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroCategoria" class="form-label">Filtrar por Categoría</label>
+                    <select class="form-select" id="filtroCategoria" onchange="filtrarIngresos()">
+                        <option value="">Todas las categorías</option>
+                        {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Categoría</th>
+                            <th>Descripción</th>
+                            <th>Monto</th>
+                            <th>Comprobante</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ingreso in ingresos %}
+                        <tr>
+                            <td>{{ ingreso.fecha }}</td>
+                            <td>{{ ingreso.categoria_nombre }}</td>
+                            <td>{{ ingreso.descripcion }}</td>
+                            <td>$ {{ "%.2f"|format(ingreso.monto) }}</td>
+                            <td>
+                                {% if ingreso.comprobante %}
+                                    <button class="btn btn-sm btn-primary" onclick="verComprobante('{{ ingreso.comprobante }}')">
+                                        <i class="fas fa-eye"></i> Ver
+                                    </button>
+                                {% else %}
+                                    <span class="text-muted">No disponible</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="editarIngreso({{ ingreso.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarIngreso({{ ingreso.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo ingreso -->
+<div class="modal fade" id="modalIngreso" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Ingreso</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formIngreso" method="POST" action="{{ url_for('agregar_ingreso') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoria_id" class="form-label">Categoría</label>
+                        <select class="form-select" id="categoria_id" name="categoria_id" required>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="monto" class="form-label">Monto ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="monto" name="monto" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comprobante" class="form-label">Comprobante</label>
+                        <input type="file" class="form-control" id="comprobante" name="comprobante">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formIngreso" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar ingreso -->
+<div class="modal fade" id="modalEditarIngreso" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Ingreso</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarIngreso" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="editFecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="editFecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editCategoria" class="form-label">Categoría</label>
+                        <select class="form-select" id="editCategoria" name="categoria_id" required>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editMonto" class="form-label">Monto ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="editMonto" name="monto" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editDescripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="editDescripcion" name="descripcion" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editComprobante" class="form-label">Comprobante</label>
+                        <input type="file" class="form-control" id="editComprobante" name="comprobante">
+                        <div id="comprobanteActual" class="form-text mt-1"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formEditarIngreso" class="btn btn-primary">Actualizar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function filtrarIngresos() {
+    const fecha = document.getElementById('filtroFecha').value;
+    const categoria = document.getElementById('filtroCategoria').value;
+    
+    window.location.href = `${window.location.pathname}?fecha=${fecha}&categoria=${categoria}`;
+}
+
+function editarIngreso(id) {
+    console.log('Editar ingreso:', id);
+    
+    // Obtener los datos del ingreso
+    fetch(`/ingresos/obtener/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const ingreso = data.ingreso;
+                console.log('Datos del ingreso:', ingreso);
+                
+                // Configurar el formulario de edición
+                document.getElementById('editFecha').value = ingreso.fecha_formato;
+                document.getElementById('editCategoria').value = ingreso.categoria_id;
+                document.getElementById('editMonto').value = ingreso.monto;
+                document.getElementById('editDescripcion').value = ingreso.descripcion || '';
+                
+                // Mostrar información sobre el comprobante actual si existe
+                const comprobanteInfo = document.getElementById('comprobanteActual');
+                if (ingreso.comprobante) {
+                    const nombreArchivo = ingreso.comprobante.split('/').pop();
+                    comprobanteInfo.innerHTML = `Comprobante actual: <a href="${ingreso.comprobante}" target="_blank">${nombreArchivo}</a><br><small>Sube un nuevo archivo para reemplazarlo</small>`;
+                } else {
+                    comprobanteInfo.innerHTML = 'No hay comprobante adjunto';
+                }
+                
+                // Configurar la acción del formulario
+                const form = document.getElementById('formEditarIngreso');
+                form.action = `/ingresos/actualizar/${id}`;
+                
+                // Mostrar el modal
+                const modal = new bootstrap.Modal(document.getElementById('modalEditarIngreso'));
+                modal.show();
+            } else {
+                alert('Error al cargar los datos del ingreso: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar los datos del ingreso');
+        });
+}
+
+function eliminarIngreso(id) {
+    if (confirm('¿Está seguro de que desea eliminar este ingreso?')) {
+        fetch(`/ingresos/eliminar/${id}`, {
+            method: 'DELETE',
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al eliminar el ingreso');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar el ingreso');
+        });
+    }
+}
+
+function verComprobante(ruta) {
+    if (!ruta) {
+        alert('No hay comprobante disponible');
+        return;
+    }
+    
+    console.log('Ruta original del comprobante:', ruta);
+    
+    // Extraer el nombre del archivo de la ruta
+    let nombreArchivo = ruta;
+    
+    // Si la ruta contiene una estructura de directorios, extraer solo el nombre del archivo
+    if (ruta.includes('/')) {
+        nombreArchivo = ruta.split('/').pop();
+    } else if (ruta.includes('\\')) {
+        nombreArchivo = ruta.split('\\').pop();
+    }
+    
+    console.log('Nombre de archivo extraído:', nombreArchivo);
+    
+    // Preparar el modal
+    const comprobanteViewer = document.getElementById('comprobanteViewer');
+    const comprobanteModal = new bootstrap.Modal(document.getElementById('modalVerComprobante'));
+    
+    // Mostrar indicador de carga
+    comprobanteViewer.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Cargando comprobante...</p></div>';
+    
+    // Mostrar el modal mientras se carga
+    comprobanteModal.show();
+    
+    // Determinar el tipo de archivo para mostrar correctamente
+    const extension = nombreArchivo.split('.').pop().toLowerCase();
+    
+    // Intentar primero con la ruta static_comprobante
+    const urlComprobante1 = `/static_comprobante/${encodeURIComponent(nombreArchivo)}`;
+    
+    // Crear una imagen para probar si existe en la primera ruta
+    const img = new Image();
+    img.onload = function() {
+        // La imagen existe en static_comprobante
+        mostrarContenido(urlComprobante1, extension);
+    };
+    img.onerror = function() {
+        // Intentar con la segunda ruta
+        const urlComprobante2 = `/ver_comprobante/${encodeURIComponent(nombreArchivo)}`;
+        mostrarContenido(urlComprobante2, extension);
+    };
+    img.src = urlComprobante1;
+    
+    // Función para mostrar el contenido según el tipo de archivo
+    function mostrarContenido(url, extension) {
+        if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
+            // Es una imagen
+            comprobanteViewer.innerHTML = `
+                <div class="text-center">
+                    <img src="${url}" class="img-fluid" alt="Comprobante">
+                </div>
+            `;
+        } else if (['pdf'].includes(extension)) {
+            // Es un PDF
+            comprobanteViewer.innerHTML = `
+                <div class="ratio ratio-16x9" style="height: 600px;">
+                    <embed src="${url}" type="application/pdf" width="100%" height="100%" />
+                </div>
+            `;
+        } else {
+            // Otro tipo de archivo
+            comprobanteViewer.innerHTML = `
+                <div class="alert alert-info text-center">
+                    <p>El archivo no se puede previsualizar en el navegador.</p>
+                    <a href="${url}" class="btn btn-primary" target="_blank">
+                        <i class="fas fa-download"></i> Descargar archivo
+                    </a>
+                </div>
+            `;
+        }
+    }
+}
+</script>
+{% endblock %}
+
+<!-- Modal para ver comprobante -->
+<div class="modal fade" id="modalVerComprobante" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Comprobante</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="comprobanteViewer" class="text-center">
+                    <!-- El contenido del comprobante se cargará aquí dinámicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

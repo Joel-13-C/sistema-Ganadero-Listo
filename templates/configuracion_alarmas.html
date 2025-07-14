@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Configuración de Alarmas</h2>
+            <p class="text-muted">Configure las notificaciones por correo electrónico para eventos importantes</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Dashboard
+            </a>
+            <a href="{{ url_for('verificar_alarmas_manual') }}" class="btn btn-primary">
+                <i class="fas fa-bell"></i> Verificar Alarmas Ahora
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Configuración de Alarmas</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('configurar_alarma') }}" method="post">
+                        <div class="mb-3">
+                            <label for="tipo" class="form-label">Tipo de Alarma</label>
+                            <select class="form-select" id="tipo" name="tipo" required>
+                                <option value="">Seleccione un tipo</option>
+                                <option value="parto">Partos Próximos</option>
+                                <option value="vacunacion">Vacunaciones Pendientes</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Correo Electrónico</label>
+                            <input type="email" class="form-control" id="email" name="email" required 
+                                placeholder="Ingrese su correo electrónico">
+                        </div>
+                        <div class="mb-3">
+                            <label for="dias_anticipacion" class="form-label">Días de Anticipación</label>
+                            <input type="number" class="form-control" id="dias_anticipacion" name="dias_anticipacion" 
+                                min="1" max="30" value="7" required>
+                            <small class="form-text text-muted">Número de días antes del evento para recibir la notificación</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Configuración de Correo Electrónico</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('configurar_email_alarmas') }}" method="post">
+                        <div class="mb-3">
+                            <label for="smtp_server" class="form-label">Servidor SMTP</label>
+                            <input type="text" class="form-control" id="smtp_server" name="smtp_server" 
+                                placeholder="smtp.gmail.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="port" class="form-label">Puerto</label>
+                            <input type="number" class="form-control" id="port" name="port" value="587" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Usuario</label>
+                            <input type="email" class="form-control" id="username" name="username" 
+                                placeholder="su_correo@gmail.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Contraseña</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <small class="form-text text-muted">
+                                Para Gmail, es posible que necesite una "contraseña de aplicación" en lugar de su contraseña normal.
+                                <a href="https://support.google.com/accounts/answer/185833" target="_blank">Más información</a>
+                            </small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="from_email" class="form-label">Correo Remitente (opcional)</label>
+                            <input type="email" class="form-control" id="from_email" name="from_email" 
+                                placeholder="Si es diferente del usuario">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Alarmas Configuradas</h4>
+        </div>
+        <div class="card-body">
+            {% if config %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Correo Electrónico</th>
+                                <th>Días de Anticipación</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if 'parto' in config %}
+                            <tr>
+                                <td>Partos Próximos</td>
+                                <td>{{ config['parto'].email }}</td>
+                                <td>{{ config['parto'].dias_anticipacion }}</td>
+                                <td>
+                                    {% if config['parto'].activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if config['parto'].activo %}
+                                    <a href="{{ url_for('desactivar_alarma', tipo='parto') }}" class="btn btn-sm btn-danger">
+                                        Desactivar
+                                    </a>
+                                    {% else %}
+                                    <a href="{{ url_for('activar_alarma', tipo='parto') }}" class="btn btn-sm btn-success">
+                                        Activar
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            
+                            {% if 'vacunacion' in config %}
+                            <tr>
+                                <td>Vacunaciones Pendientes</td>
+                                <td>{{ config['vacunacion'].email }}</td>
+                                <td>{{ config['vacunacion'].dias_anticipacion }}</td>
+                                <td>
+                                    {% if config['vacunacion'].activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if config['vacunacion'].activo %}
+                                    <a href="{{ url_for('desactivar_alarma', tipo='vacunacion') }}" class="btn btn-sm btn-danger">
+                                        Desactivar
+                                    </a>
+                                    {% else %}
+                                    <a href="{{ url_for('activar_alarma', tipo='vacunacion') }}" class="btn btn-sm btn-success">
+                                        Activar
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            
+                            {% if 'parto' not in config and 'vacunacion' not in config %}
+                            <tr>
+                                <td colspan="5" class="text-center">No hay alarmas configuradas</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    No hay alarmas configuradas. Configure una alarma utilizando el formulario de arriba.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Función para mostrar/ocultar campos según el tipo de alarma seleccionado
+    document.addEventListener('DOMContentLoaded', function() {
+        const tipoSelect = document.getElementById('tipo');
+        if (tipoSelect) {
+            tipoSelect.addEventListener('change', function() {
+                // Aquí se puede agregar lógica adicional si es necesario
+            });
+        }
+    });
+</script>
+{% endblock %}

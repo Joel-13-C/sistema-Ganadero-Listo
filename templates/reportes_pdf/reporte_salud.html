@@ -1,0 +1,61 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block contenido %}
+<h2>Reporte de Salud - {{ periodo }}</h2>
+
+<div class="resumen">
+    <p>Total de eventos de salud: <span class="total">{{ eventos|length }}</span></p>
+    <p>Vacunaciones: {{ total_vacunaciones }} | Tratamientos: {{ total_tratamientos }}</p>
+    <p>Enfermedades: {{ total_enfermedades }}</p>
+</div>
+
+<h3>Eventos de Salud</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Animal</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th>Medicamento</th>
+            <th>Dosis</th>
+            <th>Veterinario</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for evento in eventos %}
+        <tr>
+            <td>{{ evento.fecha }}</td>
+            <td>{{ evento.animal }}</td>
+            <td>{{ evento.tipo }}</td>
+            <td>{{ evento.descripcion }}</td>
+            <td>{{ evento.medicamento }}</td>
+            <td>{{ evento.dosis }}</td>
+            <td>{{ evento.veterinario }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Próximas Vacunaciones</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Animal</th>
+            <th>Vacuna</th>
+            <th>Fecha Programada</th>
+            <th>Días Restantes</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for vacuna in proximas_vacunas %}
+        <tr>
+            <td>{{ vacuna.animal }}</td>
+            <td>{{ vacuna.vacuna }}</td>
+            <td>{{ vacuna.fecha_programada }}</td>
+            <td>{{ vacuna.dias_restantes }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

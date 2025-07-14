@@ -1,0 +1,854 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <!-- Encabezado con título y botón de nuevo registro -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-milk-carton me-2 text-primary"></i>Registro de Producción Lechera</h1>
+            <p class="mb-0 text-muted">Gestión y seguimiento de la producción láctea del ganado</p>
+        </div>
+        <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRegistroLeche">
+            <i class="fas fa-plus me-2"></i>Nuevo Registro
+        </button>
+    </div>
+
+    <!-- Alertas de mensajes flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Tarjetas de resumen -->
+    <div class="row mb-4">
+        <!-- Tarjeta: Total de registros -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Registros</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ registros|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-primary text-white">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Producción total -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Producción Total</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ registros|sum(attribute='cantidad')|round(2) }} L
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-success text-white">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Calidad A -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Calidad A</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ registros|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-info text-white">
+                                <i class="fas fa-award"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Promedio diario -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Promedio Diario</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% if registros|length > 0 %}
+                                    {{ (registros|sum(attribute='cantidad') / registros|length)|round(2) }} L
+                                {% else %}
+                                    0 L
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="icon-circle bg-warning text-white">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros y tabla de datos -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">Registros de Producción</h6>
+            <div class="dropdown no-arrow">
+                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end shadow animated--fade-in">
+                    <div class="dropdown-header">Opciones:</div>
+                    <a class="dropdown-item" href="#" id="btnExportarCSV"><i class="fas fa-file-csv fa-sm fa-fw me-2 text-gray-400"></i>Exportar CSV</a>
+                    <a class="dropdown-item" href="#" id="btnImprimirRegistros"><i class="fas fa-print fa-sm fa-fw me-2 text-gray-400"></i>Imprimir</a>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros mejorados -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filtroFecha" class="small font-weight-bold text-primary">Fecha</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                            <input type="date" class="form-control" id="filtroFecha">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filtroAnimal" class="small font-weight-bold text-primary">Animal</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-cow"></i></span>
+                            <select class="form-select" id="filtroAnimal">
+                                <option value="">Todos los animales</option>
+                                {% for animal in animales %}
+                                    <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="filtroCalidad" class="small font-weight-bold text-primary">Calidad</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-star"></i></span>
+                            <select class="form-select" id="filtroCalidad">
+                                <option value="">Todas las calidades</option>
+                                <option value="A">A - Excelente</option>
+                                <option value="B">B - Buena</option>
+                                <option value="C">C - Regular</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-outline-secondary w-100" id="btnLimpiarFiltros">
+                        <i class="fas fa-broom me-2"></i>Limpiar filtros
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla de registros mejorada -->
+            <div class="table-responsive">
+                <table class="table table-hover" id="tablaRegistrosLeche">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-primary"><i class="fas fa-cow me-1"></i> Animal</th>
+                            <th class="text-primary text-center"><i class="fas fa-calendar me-1"></i> Fecha</th>
+                            <th class="text-primary text-end"><i class="fas fa-fill-drip me-1"></i> Cantidad Total (L)</th>
+                            <th class="text-primary text-center"><i class="fas fa-star me-1"></i> Calidad</th>
+                            <th class="text-primary text-center"><i class="fas fa-clock me-1"></i> Turno</th>
+                            <th class="text-primary"><i class="fas fa-comment me-1"></i> Observaciones</th>
+                            <th class="text-primary text-center"><i class="fas fa-cogs me-1"></i> Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Debug info -->
+                        <tr>
+                            <td colspan="6" class="text-center bg-light">
+                                <small class="text-muted">
+                                    Número de registros: {{ registros|length }}
+                                </small>
+                            </td>
+                        </tr>
+                        
+                        {% if registros %}
+                            {% for registro in registros %}
+                            <tr>
+                                <td>{{ registro.nombre_animal }}</td>
+                                <td class="text-center">{{ registro.fecha }}</td>
+                                <td class="text-end">{{ registro.cantidad or '0.00' }}</td>
+                                <td class="text-center">{{ registro.calidad or 'A' }}</td>
+                                <td class="text-center">{{ registro.turno or 'Ambos' }}</td>
+                                <td>{{ registro.observaciones or 'Sin observaciones' }}</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editarRegistro(this)" 
+                                        data-id="{{ registro.id }}"
+                                        data-animal="{{ registro.animal_id }}"
+                                        data-fecha="{{ registro.fecha }}"
+                                        data-cantidad="{{ registro.cantidad }}"
+                                        data-turno="{{ registro.turno }}"
+                                        data-obs="{{ registro.observaciones }}">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarRegistro(this)" data-id="{{ registro.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <i class="fas fa-info-circle me-2"></i>No hay registros disponibles
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <!-- Mensaje cuando no hay resultados -->
+                <div id="sin-resultados" class="text-center py-5 d-none">
+                    <i class="fas fa-search fa-3x text-gray-300 mb-3"></i>
+                    <p class="text-gray-500 mb-0">No se encontraron registros con los filtros seleccionados</p>
+                    <button class="btn btn-outline-primary mt-3" id="btnLimpiarFiltrosResultados">
+                        <i class="fas fa-broom me-2"></i>Limpiar filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo/editar registro -->
+<div class="modal fade" id="modalRegistroLeche" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registro de Producción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRegistroLeche" method="POST">
+                    <input type="hidden" id="registro_id" name="registro_id" value="">
+                    <div class="mb-3">
+                        <label for="animal_id" class="form-label">Animal</label>
+                        <select class="form-select" id="animal_id" name="animal_id" required>
+                            {% for animal in animales %}
+                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cantidad" class="form-label">Cantidad Total (L)</label>
+                        <input type="number" step="0.01" class="form-control" id="cantidad" name="cantidad" value="0" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="turno" class="form-label">Turno</label>
+                        <select class="form-select" id="turno" name="turno" required>
+                            <option value="Mañana">Mañana</option>
+                            <option value="Tarde">Tarde</option>
+                            <option value="Ambos" selected>Ambos</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="calidad" class="form-label">Calidad</label>
+                        <select class="form-select" id="calidad" name="calidad" required>
+                            <option value="A">A - Excelente</option>
+                            <option value="B">B - Buena</option>
+                            <option value="C">C - Regular</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarRegistro()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// Agregar estilos personalizados para los elementos visuales
+document.addEventListener('DOMContentLoaded', function() {
+    // Crear estilos para los elementos visuales
+    const style = document.createElement('style');
+    style.textContent = `
+        .border-left-primary {
+            border-left: 4px solid #4e73df;
+        }
+        .border-left-success {
+            border-left: 4px solid #1cc88a;
+        }
+        .border-left-info {
+            border-left: 4px solid #36b9cc;
+        }
+        .border-left-warning {
+            border-left: 4px solid #f6c23e;
+        }
+        .icon-circle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+        }
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        }
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+        }
+        .bg-gradient-info {
+            background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
+        }
+        .bg-gradient-warning {
+            background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);
+        }
+        .bg-opacity-10 {
+            opacity: 0.1;
+        }
+        .text-gray-800 {
+            color: #5a5c69 !important;
+        }
+        .text-gray-500 {
+            color: #b7b9cc !important;
+        }
+        .text-gray-300 {
+            color: #dddfeb !important;
+        }
+        .text-xs {
+            font-size: 0.7rem;
+        }
+        .text-truncate {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Configurar eventos para filtros
+    document.getElementById('filtroFecha').addEventListener('change', filtrarRegistrosDinamico);
+    document.getElementById('filtroAnimal').addEventListener('change', filtrarRegistrosDinamico);
+    document.getElementById('filtroCalidad').addEventListener('change', filtrarRegistrosDinamico);
+    
+    // Configurar botón para limpiar filtros
+    document.getElementById('btnLimpiarFiltros').addEventListener('click', limpiarFiltros);
+    if (document.getElementById('btnLimpiarFiltrosResultados')) {
+        document.getElementById('btnLimpiarFiltrosResultados').addEventListener('click', limpiarFiltros);
+    }
+    
+    // Configurar botones de exportación
+    if (document.getElementById('btnExportarCSV')) {
+        document.getElementById('btnExportarCSV').addEventListener('click', exportarCSV);
+    }
+    if (document.getElementById('btnImprimirRegistros')) {
+        document.getElementById('btnImprimirRegistros').addEventListener('click', imprimirRegistros);
+    }
+});
+
+// Función para filtrado dinámico (sin recargar la página)
+function filtrarRegistrosDinamico() {
+    const fecha = document.getElementById('filtroFecha').value;
+    const animalId = document.getElementById('filtroAnimal').value;
+    const calidad = document.getElementById('filtroCalidad').value;
+    
+    const filas = document.querySelectorAll('#tablaRegistrosLeche tbody tr');
+    let contadorVisible = 0;
+    
+    filas.forEach(fila => {
+        const filaFecha = fila.getAttribute('data-fecha');
+        const filaAnimal = fila.getAttribute('data-animal');
+        const filaCalidad = fila.getAttribute('data-calidad');
+        
+        let mostrar = true;
+        
+        // Aplicar filtros
+        if (fecha && filaFecha !== fecha) {
+            mostrar = false;
+        }
+        
+        if (animalId && filaAnimal !== animalId) {
+            mostrar = false;
+        }
+        
+        if (calidad && filaCalidad !== calidad) {
+            mostrar = false;
+        }
+        
+        // Mostrar u ocultar fila
+        fila.style.display = mostrar ? '' : 'none';
+        if (mostrar) contadorVisible++;
+    });
+    
+    // Mostrar mensaje de no hay resultados si es necesario
+    const sinResultados = document.getElementById('sin-resultados');
+    if (contadorVisible === 0) {
+        sinResultados.classList.remove('d-none');
+    } else {
+        sinResultados.classList.add('d-none');
+    }
+}
+
+// Función para limpiar todos los filtros
+function limpiarFiltros() {
+    document.getElementById('filtroFecha').value = '';
+    document.getElementById('filtroAnimal').value = '';
+    document.getElementById('filtroCalidad').value = '';
+    
+    // Mostrar todas las filas
+    const filas = document.querySelectorAll('#tablaRegistrosLeche tbody tr');
+    filas.forEach(fila => {
+        fila.style.display = '';
+    });
+    
+    // Ocultar mensaje de no hay resultados
+    document.getElementById('sin-resultados').classList.add('d-none');
+}
+
+// Función para filtrar registros (versión que recarga la página)
+var filtrarRegistros = function() {
+    var fecha = document.getElementById('filtroFecha').value;
+    var animal = document.getElementById('filtroAnimal').value;
+    window.location.href = '/registro_leche/?fecha=' + fecha + '&animal=' + animal;
+};
+
+// Función para ver detalles de un registro
+function verDetallesRegistro(id) {
+    fetch('/registro_leche/obtener/' + id)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al obtener el registro');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Crear contenido HTML para el modal de detalles
+            const calidad = data.calidad;
+            const calidadTexto = calidad === 'A' ? 'Excelente' : (calidad === 'B' ? 'Buena' : 'Regular');
+            const calidadColor = calidad === 'A' ? 'success' : (calidad === 'B' ? 'warning' : 'danger');
+            
+            Swal.fire({
+                title: `Registro de Producción`,
+                html: `
+                    <div class="text-start">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle bg-${calidadColor} bg-opacity-10 me-2">
+                                <i class="fas fa-cow text-${calidadColor}"></i>
+                            </div>
+                            <h5 class="mb-0">${data.nombre_animal}</h5>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <p class="mb-1"><strong><i class="fas fa-calendar me-2"></i>Fecha:</strong></p>
+                                <p class="mb-3">${data.fecha}</p>
+                                
+                                <p class="mb-1"><strong><i class="fas fa-fill-drip me-2"></i>Producción:</strong></p>
+                                <p class="mb-3">${data.cantidad} litros</p>
+                            </div>
+                            <div class="col-6">
+                                <p class="mb-1"><strong><i class="fas fa-star me-2"></i>Calidad:</strong></p>
+                                <p class="mb-3">
+                                    <span class="badge bg-${calidadColor}">${data.calidad} - ${calidadTexto}</span>
+                                </p>
+                                
+                                <p class="mb-1"><strong><i class="fas fa-id-card me-2"></i>ID Registro:</strong></p>
+                                <p class="mb-3">${data.id}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <p class="mb-1"><strong><i class="fas fa-clipboard-list me-2"></i>Observaciones:</strong></p>
+                            <p class="p-2 bg-light rounded">${data.observaciones || 'Sin observaciones registradas'}</p>
+                        </div>
+                    </div>
+                `,
+                width: '600px',
+                showCancelButton: true,
+                cancelButtonText: 'Cerrar',
+                showDenyButton: true,
+                denyButtonText: 'Editar',
+                denyButtonColor: '#3085d6',
+                confirmButtonText: 'Imprimir',
+                confirmButtonColor: '#1cc88a'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Imprimir detalles
+                    const ventanaImpresion = window.open('', '_blank');
+                    ventanaImpresion.document.write(`
+                        <html>
+                            <head>
+                                <title>Detalles de Producción - ${data.nombre_animal}</title>
+                                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                                <style>
+                                    body { padding: 20px; }
+                                    .header { text-align: center; margin-bottom: 30px; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="header">
+                                    <h3>Registro de Producción Lechera</h3>
+                                    <p>Sistema Ganadero</p>
+                                </div>
+                                <h4>Detalles del Registro</h4>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <p><strong>Animal:</strong> ${data.nombre_animal}</p>
+                                        <p><strong>Fecha:</strong> ${data.fecha}</p>
+                                        <p><strong>Producción:</strong> ${data.cantidad_manana} litros</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p><strong>Calidad:</strong> ${data.calidad} - ${calidadTexto}</p>
+                                        <p><strong>ID Registro:</strong> ${data.id}</p>
+                                    </div>
+                                </div>
+                                <hr>
+                                <h5>Observaciones:</h5>
+                                <p>${data.observaciones || 'Sin observaciones registradas'}</p>
+                                <hr>
+                                <p class="text-center">Documento generado el ${new Date().toLocaleString()}</p>
+                            </body>
+                        </html>
+                    `);
+                    ventanaImpresion.document.close();
+                    ventanaImpresion.print();
+                } else if (result.isDenied) {
+                    // Editar registro
+                    editarRegistro({getAttribute: () => data.id});
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Error al cargar los detalles del registro: ' + error.message,
+                icon: 'error'
+            });
+        });
+}
+
+// Función para exportar a CSV
+function exportarCSV() {
+    const tabla = document.getElementById('tablaRegistrosLeche');
+    const filas = tabla.querySelectorAll('tbody tr:not([style*="display: none"])');
+    
+    if (filas.length === 0) {
+        Swal.fire({
+            title: 'Sin datos',
+            text: 'No hay datos para exportar',
+            icon: 'warning'
+        });
+        return;
+    }
+    
+    let csv = 'Animal,Fecha,Producción (L),Calidad,Observaciones\n';
+    
+    filas.forEach(fila => {
+        const animal = fila.querySelector('td:nth-child(1)').textContent.trim();
+        const fecha = fila.querySelector('td:nth-child(2)').textContent.trim();
+        const produccion = fila.querySelector('td:nth-child(3)').textContent.trim().replace(' L', '');
+        const calidad = fila.querySelector('td:nth-child(4)').textContent.trim();
+        let observaciones = fila.querySelector('td:nth-child(5)').textContent.trim();
+        
+        // Escapar comillas en observaciones
+        observaciones = observaciones.replace(/"/g, '""');
+        
+        csv += `"${animal}","${fecha}","${produccion}","${calidad}","${observaciones}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'registros_produccion_' + new Date().toISOString().split('T')[0] + '.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Función para imprimir registros
+function imprimirRegistros() {
+    const tabla = document.getElementById('tablaRegistrosLeche');
+    const filas = tabla.querySelectorAll('tbody tr:not([style*="display: none"])');
+    
+    if (filas.length === 0) {
+        Swal.fire({
+            title: 'Sin datos',
+            text: 'No hay datos para imprimir',
+            icon: 'warning'
+        });
+        return;
+    }
+    
+    const ventanaImpresion = window.open('', '_blank');
+    let contenidoTabla = '';
+    
+    filas.forEach(fila => {
+        const animal = fila.querySelector('td:nth-child(1)').textContent.trim();
+        const fecha = fila.querySelector('td:nth-child(2)').textContent.trim();
+        const produccion = fila.querySelector('td:nth-child(3)').textContent.trim();
+        const calidad = fila.querySelector('td:nth-child(4)').textContent.trim();
+        const observaciones = fila.querySelector('td:nth-child(5)').textContent.trim();
+        
+        contenidoTabla += `
+            <tr>
+                <td>${animal}</td>
+                <td>${fecha}</td>
+                <td>${produccion}</td>
+                <td>${calidad}</td>
+                <td>${observaciones}</td>
+            </tr>
+        `;
+    });
+    
+    ventanaImpresion.document.write(`
+        <html>
+            <head>
+                <title>Registros de Producción Lechera</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding: 20px; }
+                    .header { text-align: center; margin-bottom: 30px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h3>Registros de Producción Lechera</h3>
+                    <p>Sistema Ganadero - Fecha: ${new Date().toLocaleDateString()}</p>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Animal</th>
+                            <th>Fecha</th>
+                            <th>Producción</th>
+                            <th>Calidad</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${contenidoTabla}
+                    </tbody>
+                </table>
+                <div class="mt-4">
+                    <p><strong>Total de registros:</strong> ${filas.length}</p>
+                </div>
+                <hr>
+                <p class="text-center">Documento generado el ${new Date().toLocaleString()}</p>
+            </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
+    ventanaImpresion.print();
+}
+
+// Función para editar un registro
+var editarRegistro = function(button) {
+    var id = typeof button === 'object' ? button.getAttribute('data-id') : button;
+    fetch('/registro_leche/obtener/' + id)
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('Error al obtener el registro');
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            // Verificar si los datos vienen dentro de data.registro
+            var registro = data.registro || data;
+            
+            console.log('Datos recibidos:', registro);
+            
+            // Asegurarse de que todos los campos estén definidos
+            if (!registro.id || !registro.fecha || !registro.animal_id || !registro.cantidad) {
+                console.error('Datos incompletos:', registro);
+                throw new Error('Datos del registro incompletos');
+            }
+
+            document.getElementById('registro_id').value = registro.id;
+            document.getElementById('animal_id').value = registro.animal_id;
+            document.getElementById('fecha').value = registro.fecha;
+            document.getElementById('cantidad').value = registro.cantidad;
+            document.getElementById('turno').value = registro.turno || 'Ambos';
+            document.getElementById('calidad').value = registro.calidad || 'A';
+            document.getElementById('observaciones').value = registro.observaciones || '';
+            
+            document.getElementById('formRegistroLeche').action = '/registro_leche/editar/' + registro.id;
+            var modal = new bootstrap.Modal(document.getElementById('modalRegistroLeche'));
+            modal.show();
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Error al cargar el registro: ' + error.message,
+                icon: 'error'
+            });
+        });
+};
+
+// Función para eliminar un registro
+var eliminarRegistro = function(button) {
+    var id = button.getAttribute('data-id');
+    Swal.fire({
+        title: '¿Eliminar registro?',
+        text: 'Esta acción no se puede deshacer',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('/registro_leche/eliminar/' + id, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    Swal.fire({
+                        title: 'Eliminado',
+                        text: 'El registro ha sido eliminado correctamente',
+                        icon: 'success'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    throw new Error('Error al eliminar el registro');
+                }
+            })
+            .catch(function(error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Error al eliminar el registro: ' + error.message,
+                    icon: 'error'
+                });
+            });
+        }
+    });
+};
+
+// Función para guardar un registro
+var guardarRegistro = function() {
+    var form = document.getElementById('formRegistroLeche');
+    var fecha = document.getElementById('fecha').value;
+    
+    if (!fecha) {
+        Swal.fire({
+            title: 'Error',
+            text: 'Por favor, seleccione una fecha',
+            icon: 'error'
+        });
+        return;
+    }
+    
+    var registroId = document.getElementById('registro_id').value;
+    if (registroId) {
+        // Si estamos editando, enviamos el formulario con fetch para mostrar mensaje personalizado
+        var formData = new FormData(form);
+        
+        fetch('/registro_leche/editar/' + registroId, {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) {
+            if (response.redirected) {
+                // Cerrar el modal
+                var modalElement = document.getElementById('modalRegistroLeche');
+                var modal = bootstrap.Modal.getInstance(modalElement);
+                modal.hide();
+                
+                // Mostrar mensaje de éxito
+                Swal.fire({
+                    title: 'Éxito',
+                    text: 'Registro de producción actualizado correctamente',
+                    icon: 'success'
+                }).then(function() {
+                    // Recargar la página para mostrar los datos actualizados
+                    window.location.href = response.url;
+                });
+            } else {
+                throw new Error('Error al actualizar el registro');
+            }
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Error al actualizar el registro',
+                icon: 'error'
+            });
+        });
+    } else {
+        // Si es un nuevo registro, enviamos el formulario normalmente
+        form.method = 'POST';
+        form.action = '/registro_leche/agregar';
+        form.submit();
+    }
+};
+
+// Limpiar el formulario cuando se abre el modal para un nuevo registro
+document.getElementById('modalRegistroLeche').addEventListener('show.bs.modal', function(event) {
+    if (event.relatedTarget && event.relatedTarget.tagName === 'BUTTON' && !event.relatedTarget.getAttribute('data-id')) {
+        document.getElementById('formRegistroLeche').reset();
+        document.getElementById('registro_id').value = '';
+        document.getElementById('formRegistroLeche').action = '/registro_leche/agregar';
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Ganadero - Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/3.5.0/remixicon.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    {% block extra_css %}
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f4f6f9;
+        }
+
+        body {
+            background-image: url("{{ url_for('static', filename='images/fondoDashb.jpg') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-color: var(--background-color);
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.3);
+            z-index: 0;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .dashboard-card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .dashboard-card-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .dashboard-card-title {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .dashboard-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-decoration: none;
+            transition: transform 0.3s ease;
+        }
+
+        .quick-action-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .quick-action-btn i {
+            margin-right: 10px;
+            font-size: 1.5rem;
+        }
+
+        .recent-activity {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .activity-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #f1f1f1;
+        }
+
+        .chatbot-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .chatbot-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chatbot-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .chatbot-input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .chatbot-input {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .chatbot-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        .container-fluid {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Estilos para la barra lateral con scroll */
+        .sidebar {
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+        
+        /* Estilos para el perfil de usuario */
+        .user-profile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .profile-image, .default-profile-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--secondary-color);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin-bottom: 8px;
+        }
+        
+        .profile-image {
+            object-fit: cover;
+        }
+        
+        .default-profile-icon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #3498db;
+            color: white;
+            font-size: 30px;
+        }
+        
+        .user-info {
+            text-align: center;
+            color: white;
+        }
+        
+        .user-info h3 {
+            font-size: 14px;
+            margin: 3px 0;
+            font-weight: 600;
+        }
+        
+        .user-info p {
+            font-size: 11px;
+            margin: 0;
+            opacity: 0.8;
+        }
+        
+        /* Estilos para el menú desplegable */
+        .sidebar-dropdown {
+            position: relative;
+        }
+
+        .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .dropdown-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .dropdown-menu {
+            display: none;
+            padding-left: 20px;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-menu li a {
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+
+        .dropdown-menu li a i {
+            font-size: 1.1em;
+        }
+    </style>
+    {% endblock %}
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>
+                    <i class="ri-dashboard-line"></i>
+                    SistemaG
+                </h1>
+            </div>
+            
+            <!-- Perfil del usuario -->
+            <div class="user-profile">
+                {% if session.foto_perfil %}
+                    <img src="{{ session.foto_perfil }}" alt="Foto de perfil" class="profile-image">
+                {% else %}
+                    <div class="default-profile-icon">
+                        <i class="ri-user-fill"></i>
+                    </div>
+                {% endif %}
+                <div class="user-info">
+                    <h3>{{ session.nombre if session.nombre else session.username }}</h3>
+                    <p>{{ session.cargo if session.cargo else 'Usuario' }}</p>
+                </div>
+            </div>
+            <nav>
+                <ul>
+                    <li>
+                        <a href="{{ url_for('dashboard') }}" class="active">
+                            <i class="ri-dashboard-line"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('animales') }}">
+                            <i class="ri-cow-line"></i>
+                            <span>Mis Animales</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('registrar_animal') }}">
+                            <i class="ri-add-circle-line"></i>
+                            <span>Registrar Animal</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('gestacion') }}">
+                            <i class="ri-calendar-line"></i>
+                            <span>Gestación</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('pastizales') }}">
+                            <i class="ri-plant-line"></i>
+                            <span>Pastizales</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('vacunas') }}">
+                            <i class="ri-syringe-line"></i>
+                            <span>Vacunas</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('editar_perfil') }}">
+                            <i class="ri-settings-3-line"></i>
+                            <span>Perfil</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('login') }}" class="logout">
+                            <i class="ri-logout-box-line"></i>
+                            <span>Cerrar Sesión</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="main-content dashboard-content">
+            <header>
+                <div class="welcome">
+                    <h2>Bienvenido al Sistema de Gestión Ganadera</h2>
+                    <p>Panel de control principal</p>
+                </div>
+            </header>
+            
+            <div class="container-fluid">
+                <div class="dashboard-grid">
+                    <!-- Resumen General -->
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-icon">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <h3 class="dashboard-card-title">Resumen General</h3>
+                        <div class="dashboard-stats">
+                            <div>
+                                <h4>Total Animales</h4>
+                                <p class="h2 text-primary">{{ total_animales or 150 }}</p>
+                            </div>
+                            <div>
+                                <h4>Razas</h4>
+                                <p class="h2 text-primary">{{ total_razas or 5 }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if gestaciones_proximas %}
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-icon text-warning">
+                            <i class="ri-alarm-warning-line"></i>
+                        </div>
+                        <h3 class="dashboard-card-title text-warning">Alertas de Gestación</h3>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Animal</th>
+                                        <th>Fecha Parto</th>
+                                        <th>Días</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for g in gestaciones_proximas %}
+                                    <tr {% if g.dias_restantes <= 3 %}class="table-danger"{% endif %}>
+                                        <td>{{ g.numero_arete }}</td>
+                                        <td>{{ g.fecha_probable_parto.strftime('%Y-%m-%d') }}</td>
+                                        <td>
+                                            <span class="badge {% if g.dias_restantes <= 3 %}bg-danger{% else %}bg-warning{% endif %}">
+                                                {{ g.dias_restantes }}d
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('gestacion') }}" class="btn btn-sm btn-primary">
+                                                <i class="ri-eye-line"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Acciones Rápidas -->
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3 class="dashboard-card-title">Acciones Rápidas</h3>
+                        <div class="quick-actions">
+                            <a href="{{ url_for('registrar_animal') }}" class="quick-action-btn">
+                                <i class="fas fa-plus"></i> Registrar Animal
+                            </a>
+                            <a href="{{ url_for('animales') }}" class="quick-action-btn">
+                                <i class="fas fa-list"></i> Listar Animales
+                            </a>
+                            <a href="{{ url_for('editar_perfil') }}" class="quick-action-btn">
+                                <i class="fas fa-user-edit"></i> Editar Perfil
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Próximos Partos -->
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-icon">
+                            <i class="fas fa-baby"></i>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h3 class="dashboard-card-title mb-0">Próximos Partos</h3>
+                            <a href="{{ url_for('configuracion_alarmas') }}" class="btn btn-sm btn-outline-warning" title="Configurar alarmas">
+                                <i class="fas fa-bell"></i> Configurar alarmas
+                            </a>
+                        </div>
+                        <div class="recent-activity">
+                            {% if proximos_partos %}
+                                {% for parto in proximos_partos %}
+                                <div class="activity-item">
+                                    <span>
+                                        <strong>{{ parto.nombre_animal }}</strong> (Arete: {{ parto.numero_arete }})
+                                        <br><small>Fecha estimada: {{ (parto.fecha_inseminacion + timedelta(days=283)).strftime('%d/%m/%Y') }}</small>
+                                    </span>
+                                    <small class="text-muted">En {{ ((parto.fecha_inseminacion + timedelta(days=283)) - now.date()).days }} días</small>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="activity-item">
+                                    <span>No hay partos próximos registrados</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="mt-2 text-end">
+                            <a href="{{ url_for('gestacion') }}" class="btn btn-sm btn-outline-primary">Ver todos</a>
+                        </div>
+                    </div>
+
+                    <!-- Próximas Vacunaciones -->
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-icon">
+                            <i class="fas fa-syringe"></i>
+                        </div>
+                        <h3 class="dashboard-card-title">Próximas Vacunaciones</h3>
+                        <div class="recent-activity">
+                            {% if proximas_vacunaciones %}
+                                {% for vacunacion in proximas_vacunaciones %}
+                                <div class="activity-item">
+                                    <span>
+                                        <strong>{{ vacunacion.nombre_animal }}</strong> (Arete: {{ vacunacion.numero_arete }})
+                                        <br><small>Tipo: {{ vacunacion.tipo_vacuna }} - Producto: {{ vacunacion.producto }}</small>
+                                        <br><small>Fecha: {{ vacunacion.fecha_programada.strftime('%d/%m/%Y') }}</small>
+                                    </span>
+                                    <small class="text-muted">En {{ (vacunacion.fecha_programada - now.date()).days }} días</small>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="activity-item">
+                                    <span>No hay vacunaciones próximas registradas</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="mt-2 text-end">
+                            <a href="{{ url_for('vacunas') }}" class="btn btn-sm btn-outline-primary">Ver todas</a>
+                        </div>
+                    </div>
+
+                    <!-- Actividad Reciente -->
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3 class="dashboard-card-title">Actividad Reciente</h3>
+                        <div class="recent-activity">
+                            {% if actividades %}
+                                {% for actividad in actividades %}
+                                <div class="activity-item">
+                                    <span>
+                                        <strong>{{ actividad.modulo }}:</strong> {{ actividad.accion }}
+                                        {% if actividad.descripcion %}
+                                        <br><small>{{ actividad.descripcion }}</small>
+                                        {% endif %}
+                                    </span>
+                                    <small class="text-muted">{{ actividad.tiempo_relativo }}</small>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="activity-item">
+                                    <span>No hay actividad reciente registrada</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="mt-2 text-end">
+                            <a href="{{ url_for('historial_auditoria') }}" class="btn btn-sm btn-outline-primary">Ver todas</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div class="chatbot-toggle" onclick="toggleChatbot()">
+        <i class="fas fa-comment"></i>
+    </div>
+
+    <div id="chatbot-container" class="chatbot-container">
+        <div class="chatbot-header">
+            <span>Asistente Ganadero</span>
+            <button class="btn btn-sm btn-light" onclick="toggleChatbot()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="chatbot-messages" class="chatbot-messages">
+            <!-- Mensajes del chatbot se insertarán aquí -->
+        </div>
+        <div class="chatbot-input-container">
+            <input type="text" id="chatbot-input" class="form-control chatbot-input" 
+                   placeholder="Escribe tu mensaje...">
+            <button class="btn btn-primary" onclick="enviarMensaje()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    {% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Manejar el menú desplegable
+            const dropdownToggle = document.querySelector('.dropdown-toggle');
+            const dropdownMenu = document.querySelector('.dropdown-menu');
+            const dropdownIcon = document.querySelector('.dropdown-icon');
+
+            dropdownToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                dropdownMenu.classList.toggle('show');
+                dropdownIcon.style.transform = dropdownMenu.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0)';
+            });
+
+            // Aquí puedes agregar interactividad adicional si es necesario
+        });
+
+        function toggleChatbot() {
+            const chatbot = document.getElementById('chatbot-container');
+            chatbot.style.display = chatbot.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        function agregarMensaje(mensaje, tipo) {
+            const mensajesContainer = document.getElementById('chatbot-messages');
+            const mensajeDiv = document.createElement('div');
+            mensajeDiv.classList.add('mensaje', tipo);
+            mensajeDiv.textContent = mensaje;
+            mensajesContainer.appendChild(mensajeDiv);
+            mensajesContainer.scrollTop = mensajesContainer.scrollHeight;
+        }
+
+        function enviarMensaje() {
+            const input = document.getElementById('chatbot-input');
+            const mensaje = input.value.trim();
+
+            if (mensaje) {
+                agregarMensaje(mensaje, 'usuario');
+                input.value = '';
+
+                fetch('/chatbot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ mensaje: mensaje })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.respuesta) {
+                        agregarMensaje(data.respuesta, 'chatbot');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    agregarMensaje('Hubo un problema con el chatbot', 'error');
+                });
+            }
+        }
+
+        // Función para ver todas las actividades
+        function verTodasLasActividades() {
+            window.location.href = "{{ url_for('historial_auditoria') }}";
+        }
+        
+        // Evento para enviar mensaje con Enter
+        document.getElementById('chatbot-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                enviarMensaje();
+            }
+        });
+    </script>
+    {% endblock %}
+</body>
+</html>

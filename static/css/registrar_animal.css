@@ -1,0 +1,133 @@
+/* Estilos para el formulario de registro de animales */
+.registro-animal-container {
+    background-color: var(--color-background);
+    padding: 2rem 0;
+}
+
+.registro-animal-card {
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.registro-animal-card .card-header {
+    background: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+    color: white;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.registro-animal-card .card-header h2 {
+    margin: 0;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+}
+
+.registro-animal-card .card-header i {
+    margin-right: 15px;
+    font-size: 1.8rem;
+}
+
+.animal-photo-upload {
+    position: relative;
+    text-align: center;
+}
+
+.photo-upload-label {
+    cursor: pointer;
+    display: block;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.photo-upload-label:hover {
+    opacity: 0.8;
+}
+
+.photo-upload-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.photo-upload-label:hover .photo-upload-overlay {
+    opacity: 1;
+}
+
+.photo-upload-overlay i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.input-group-text {
+    background-color: transparent;
+    border: none;
+    color: var(--color-text-light);
+}
+
+.form-label {
+    font-weight: 600;
+    color: var(--color-text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    border-color: var(--color-border);
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.2rem rgba(74, 108, 247, 0.1);
+}
+
+.form-control.is-invalid, .form-select.is-invalid {
+    border-color: #dc3545;
+}
+
+.btn-primary {
+    background: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(74, 108, 247, 0.3);
+}
+
+@media (max-width: 768px) {
+    .registro-animal-card .card-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .registro-animal-card .card-header i {
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+}

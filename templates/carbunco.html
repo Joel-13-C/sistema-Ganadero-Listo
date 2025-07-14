@@ -1,0 +1,361 @@
+{% extends 'base.html' %}
+
+{% block title %}Vacunación contra Carbunco{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Registro de Vacunación contra Carbunco</h2>
+
+    <!-- Formulario de registro -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="formCarbunco" method="POST" action="{{ url_for('registrar_carbunco') }}">
+                <div class="row">
+                    <!-- Fecha de registro -->
+                    <div class="col-md-3 mb-3">
+                        <label for="fecha_registro" class="form-label">Fecha de Aplicación</label>
+                        <input type="date" class="form-control" id="fecha_registro" name="fecha_registro" required
+                            value="{{ hoy }}">
+                    </div>
+
+                    <!-- Producto -->
+                    <div class="col-md-3 mb-3">
+                        <label for="producto" class="form-label">Producto</label>
+                        <select class="form-select" id="producto" name="producto" required>
+                            <option value="">Seleccione un producto</option>
+                            <option value="Carbunbac">Carbunbac</option>
+                            <option value="Carbuvac">Carbuvac</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                        <div id="otroProducto" class="mt-2 d-none">
+                            <input type="text" class="form-control" name="otro_producto" placeholder="Especifique el producto">
+                        </div>
+                    </div>
+
+                    <!-- Lote -->
+                    <div class="col-md-3 mb-3">
+                        <label for="lote" class="form-label">Número de Lote</label>
+                        <input type="text" class="form-control" id="lote" name="lote" required>
+                    </div>
+
+                    <!-- Vacunador -->
+                    <div class="col-md-3 mb-3">
+                        <label for="vacunador" class="form-label">Vacunador</label>
+                        <input type="text" class="form-control" id="vacunador" name="vacunador" required>
+                    </div>
+                </div>
+
+                <!-- Tipo de aplicación -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="form-label">Tipo de Aplicación</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_general"
+                                value="general" checked>
+                            <label class="form-check-label" for="aplicacion_general">
+                                Aplicación General (todos los animales)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_aplicacion" id="aplicacion_especifica"
+                                value="especifica">
+                            <label class="form-check-label" for="aplicacion_especifica">
+                                Aplicación Específica (seleccionar animales)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selección de animales -->
+                <div id="seleccion_animales" class="d-none">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="seleccionar_todos">
+                                <label class="form-check-label" for="seleccionar_todos">
+                                    Seleccionar todos
+                                </label>
+                            </div>
+                            <div class="row">
+                                {% for animal in animales %}
+                                <div class="col-md-4 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input animal-checkbox" type="checkbox"
+                                            name="animales_seleccionados[]" value="{{ animal.id }}"
+                                            id="animal_{{ animal.id }}">
+                                        <label class="form-check-label" for="animal_{{ animal.id }}">
+                                            {{ animal.numero_arete }} - {{ animal.nombre }} ({{ animal.condicion }})
+                                            {% if animal.ultima_carbunco %}
+                                            <small class="text-muted d-block">
+                                                Última aplicación: {{ animal.ultima_carbunco.strftime('%d/%m/%Y') }}
+                                            </small>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Próxima aplicación -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Próxima Aplicación</label>
+                        <p class="form-control-plaintext" id="proxima_aplicacion"></p>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Registrar Vacunación</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Historial de vacunaciones -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">Historial de Vacunaciones</h3>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Producto</th>
+                            <th>Lote</th>
+                            <th>Vacunador</th>
+                            <th>Tipo</th>
+                            <th>Animales</th>
+                            <th>Próxima Aplicación</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                        <tr>
+                            <td>{{ registro.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ registro.producto }}</td>
+                            <td>{{ registro.lote }}</td>
+                            <td>{{ registro.vacunador }}</td>
+                            <td>{{ 'General' if registro.aplicacion_general else 'Específica' }}</td>
+                            <td>{{ registro.cantidad_animales }}</td>
+                            <td>{{ registro.proxima_aplicacion.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <button type="button" class="btn btn-info btn-sm me-1" onclick="verDetalles({{ registro.id|tojson|safe }})">
+                                    <i class="fas fa-eye"></i>
+                                    Ver Detalles
+                                </button>
+                                <a href="{{ url_for('generar_pdf_carbunco', registro_id=registro.id) }}" class="btn btn-primary btn-sm me-1" target="_blank">
+                                    <i class="fas fa-file-pdf"></i>
+                                    Generar PDF
+                                </a>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="confirmarEliminar({{ registro.id }})">
+                                    <i class="fas fa-trash"></i>
+                                    Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de detalles -->
+<div class="modal fade" id="detallesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalles de la Vacunación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesContenido">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-check-label small {
+        font-size: 0.85em;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejo del tipo de aplicación
+    const aplicacionGeneral = document.getElementById('aplicacion_general');
+    const aplicacionEspecifica = document.getElementById('aplicacion_especifica');
+    const seleccionAnimales = document.getElementById('seleccion_animales');
+
+    function toggleSeleccionAnimales() {
+        seleccionAnimales.classList.toggle('d-none', aplicacionGeneral.checked);
+    }
+
+    aplicacionGeneral.addEventListener('change', toggleSeleccionAnimales);
+    aplicacionEspecifica.addEventListener('change', toggleSeleccionAnimales);
+
+    // Manejo de la selección de producto
+    const producto = document.getElementById('producto');
+    const otroProducto = document.getElementById('otroProducto');
+
+    producto.addEventListener('change', function() {
+        otroProducto.classList.toggle('d-none', this.value !== 'Otro');
+    });
+
+    // Cálculo de próxima aplicación (1 año)
+    const fechaRegistro = document.getElementById('fecha_registro');
+    const proximaAplicacion = document.getElementById('proxima_aplicacion');
+
+    fechaRegistro.addEventListener('change', function() {
+        if (this.value) {
+            const fecha = new Date(this.value);
+            fecha.setFullYear(fecha.getFullYear() + 1);
+            proximaAplicacion.textContent = fecha.toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+    });
+
+    // Seleccionar todos los animales
+    const seleccionarTodos = document.getElementById('seleccionar_todos');
+    const animalCheckboxes = document.querySelectorAll('.animal-checkbox');
+
+    seleccionarTodos.addEventListener('change', function() {
+        animalCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+});
+
+// Función para ver detalles
+function verDetalles(id) {
+    fetch(`/carbunco/detalles/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Datos recibidos:', data);
+            
+            // Asegurar que todos los campos existan, usando valores por defecto si no
+            const fechaRegistro = data.fecha_registro || 'No disponible';
+            const producto = data.producto || 'No especificado';
+            const lote = data.lote || 'No especificado';
+            const vacunador = data.vacunador || 'No especificado';
+            const proximaAplicacion = data.proxima_aplicacion || 'No especificada';
+            const animales = data.animales || [];
+            
+            document.getElementById('detallesContenido').innerHTML = `
+                <div class="table-responsive">
+                    <table class="table">
+                        <tr>
+                            <th>Fecha de Registro:</th>
+                            <td>${fechaRegistro}</td>
+                        </tr>
+                        <tr>
+                            <th>Producto:</th>
+                            <td>${producto}</td>
+                        </tr>
+                        <tr>
+                            <th>Lote:</th>
+                            <td>${lote}</td>
+                        </tr>
+                        <tr>
+                            <th>Vacunador:</th>
+                            <td>${vacunador}</td>
+                        </tr>
+                        <tr>
+                            <th>Próxima Aplicación:</th>
+                            <td>${proximaAplicacion}</td>
+                        </tr>
+                    </table>
+                </div>
+                ${animales.length > 0 ? `
+                <h6 class="mt-3">Animales Vacunados:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Identificación</th>
+                                <th>Categoría</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${animales.map(animal => `
+                                <tr>
+                                    <td>${animal.id || ''}</td>
+                                    <td>${animal.identificacion || 'No disponible'}</td>
+                                    <td>${animal.categoria || 'No especificada'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : '<p class="mt-3">No hay animales registrados para esta vacunación.</p>'}
+            `;
+            const detallesModal = new bootstrap.Modal(document.getElementById('detallesModal'));
+            detallesModal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar los detalles: ' + error.message);
+        });
+}
+</script>
+
+<!-- Modal de confirmación para eliminar -->
+<div class="modal fade" id="confirmarEliminarModal" tabindex="-1" aria-labelledby="confirmarEliminarModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmarEliminarModalLabel">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar este registro de vacunación contra Carbunco?</p>
+                <p class="text-danger"><strong>Esta acción no se puede deshacer.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formEliminar" method="POST">
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para mostrar detalles -->
+<div class="modal fade" id="detallesModal" tabindex="-1" aria-labelledby="detallesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detallesModalLabel">Detalles de Vacunación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="detallesContenido">
+                <!-- El contenido se cargará dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Función para confirmar eliminación
+function confirmarEliminar(id) {
+    document.getElementById('formEliminar').action = `/eliminar_carbunco/${id}`;
+    const modal = new bootstrap.Modal(document.getElementById('confirmarEliminarModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

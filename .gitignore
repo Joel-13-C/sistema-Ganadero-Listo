@@ -1,0 +1,63 @@
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Entorno virtual
+venv/
+ENV/
+
+# Archivos de configuración local
+config.py
+*.ini
+*.conf
+
+# Archivos de base de datos
+*.db
+*.sqlite3
+
+# Archivos de registro
+*.log
+
+# Archivos de respaldo
+*.bak
+*.backup
+*~
+*.swp
+
+# Carpeta de archivos antiguos
+archivos_antiguos/
+
+# Archivos de imágenes subidas por usuarios
+uploads/
+
+# Archivos temporales
+.tmp/
+.temp/
+
+# Archivos de IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Mantenimiento de Equipos</h2>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalMantenimiento">
+                <i class="fas fa-plus"></i> Programar Mantenimiento
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Mantenimientos Pendientes</h5>
+                    <h3 class="card-text">{{ mantenimientos_pendientes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Mantenimientos Completados</h5>
+                    <h3 class="card-text">{{ mantenimientos_completados }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Próximo Mantenimiento</h5>
+                    <h3 class="card-text">{{ proximo_mantenimiento }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroEquipo" class="form-label">Filtrar por Equipo</label>
+                    <select class="form-select" id="filtroEquipo" onchange="filtrarMantenimientos()">
+                        <option value="">Todos los equipos</option>
+                        {% for equipo in equipos %}
+                            <option value="{{ equipo.id }}">{{ equipo.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroEstado" class="form-label">Filtrar por Estado</label>
+                    <select class="form-select" id="filtroEstado" onchange="filtrarMantenimientos()">
+                        <option value="">Todos los estados</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En Proceso">En Proceso</option>
+                        <option value="Completado">Completado</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroTipo" class="form-label">Filtrar por Tipo</label>
+                    <select class="form-select" id="filtroTipo" onchange="filtrarMantenimientos()">
+                        <option value="">Todos los tipos</option>
+                        <option value="Preventivo">Preventivo</option>
+                        <option value="Correctivo">Correctivo</option>
+                        <option value="Predictivo">Predictivo</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Equipo</th>
+                            <th>Tipo</th>
+                            <th>Fecha Programada</th>
+                            <th>Estado</th>
+                            <th>Responsable</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mantenimiento in mantenimientos %}
+                        <tr>
+                            <td>{{ mantenimiento.equipo_nombre }}</td>
+                            <td>{{ mantenimiento.tipo }}</td>
+                            <td>{{ mantenimiento.fecha_programada }}</td>
+                            <td>
+                                <span class="badge {% if mantenimiento.estado == 'Completado' %}bg-success{% elif mantenimiento.estado == 'Pendiente' %}bg-warning{% elif mantenimiento.estado == 'En Proceso' %}bg-info{% else %}bg-danger{% endif %}">
+                                    {{ mantenimiento.estado }}
+                                </span>
+                            </td>
+                            <td>{{ mantenimiento.responsable }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="verDetalles({{ mantenimiento.id }})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="editarMantenimiento({{ mantenimiento.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="eliminarMantenimiento({{ mantenimiento.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo mantenimiento -->
+<div class="modal fade" id="modalMantenimiento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Programar Mantenimiento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formMantenimiento" method="POST" action="{{ url_for('agregar_mantenimiento') }}">
+                    <div class="mb-3">
+                        <label for="equipo_id" class="form-label">Equipo</label>
+                        <select class="form-select" id="equipo_id" name="equipo_id" required>
+                            <option value="">Seleccione un equipo</option>
+                            {% for equipo in equipos %}
+                                <option value="{{ equipo.id }}">{{ equipo.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo" class="form-label">Tipo de Mantenimiento</label>
+                        <select class="form-select" id="tipo" name="tipo" required>
+                            <option value="Preventivo">Preventivo</option>
+                            <option value="Correctivo">Correctivo</option>
+                            <option value="Predictivo">Predictivo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha_programada" class="form-label">Fecha Programada</label>
+                        <input type="date" class="form-control" id="fecha_programada" name="fecha_programada" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="responsable" class="form-label">Responsable</label>
+                        <input type="text" class="form-control" id="responsable" name="responsable" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="estado" class="form-label">Estado</label>
+                        <select class="form-select" id="estado" name="estado" required>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formMantenimiento" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para ver detalles -->
+<div class="modal fade" id="modalDetalles" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalles del Mantenimiento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesMantenimientoContenido">
+                <!-- El contenido se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function filtrarMantenimientos() {
+    const equipo = document.getElementById('filtroEquipo').value;
+    const estado = document.getElementById('filtroEstado').value;
+    const tipo = document.getElementById('filtroTipo').value;
+    
+    window.location.href = `{{ url_for('mantenimientos') }}?equipo=${equipo}&estado=${estado}&tipo=${tipo}`;
+}
+
+function verDetalles(id) {
+    fetch(`/detalles_mantenimiento/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            const contenido = document.getElementById('detallesMantenimientoContenido');
+            contenido.innerHTML = `
+                <p><strong>Equipo:</strong> ${data.equipo_nombre}</p>
+                <p><strong>Tipo:</strong> ${data.tipo}</p>
+                <p><strong>Fecha Programada:</strong> ${data.fecha_programada}</p>
+                <p><strong>Estado:</strong> ${data.estado}</p>
+                <p><strong>Responsable:</strong> ${data.responsable}</p>
+                <p><strong>Descripción:</strong> ${data.descripcion}</p>
+                
+                <h6 class="mt-4">Historial de Actualizaciones</h6>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.actualizaciones.map(a => `
+                            <tr>
+                                <td>${a.fecha}</td>
+                                <td>${a.estado}</td>
+                                <td>${a.observaciones}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+        });
+}
+
+function editarMantenimiento(id) {
+    // Implementar lógica de edición
+}
+
+function eliminarMantenimiento(id) {
+    if (confirm('¿Está seguro de que desea eliminar este mantenimiento?')) {
+        fetch(`/eliminar_mantenimiento/${id}`, {
+            method: 'DELETE',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error al eliminar el mantenimiento');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}
