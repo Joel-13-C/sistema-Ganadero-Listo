@@ -17,45 +17,34 @@
                             <h6 class="border-bottom pb-2">Información General</h6>
                             <table class="table table-borderless">
                                 <tr>
-                                    <th width="40%">Dimensión:</th>
-                                    <td>{{ pastizal.dimension }} m²</td>
+                                    <th width="40%">Área:</th>
+                                    <td>{{ pastizal.area }} m²</td>
                                 </tr>
                                 <tr>
                                     <th>Tipo de Hierba:</th>
-                                    <td>{{ pastizal.tipo_hierba }}</td>
+                                    <td>{{ pastizal.descripcion.split(': ')[1] if pastizal.descripcion and ': ' in pastizal.descripcion else 'N/A' }}</td>
                                 </tr>
                                 <tr>
                                     <th>Estado:</th>
                                     <td>
-                                        {% if pastizal.estado == 'Disponible' %}
-                                            <span class="badge bg-success">{{ pastizal.estado }}</span>
-                                        {% elif pastizal.estado == 'En uso' %}
-                                            <span class="badge bg-primary">{{ pastizal.estado }}</span>
-                                        {% else %}
+                                        {% if pastizal.estado == 'Activo' %}
+                                            <span class="badge bg-success">{{ 'En uso' if pastizal.animales_actuales > 0 else 'Activo' }}</span>
+                                        {% elif pastizal.estado == 'Inactivo' %}
                                             <span class="badge bg-warning">{{ pastizal.estado }}</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ pastizal.estado }}</span>
                                         {% endif %}
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>Capacidad Máxima:</th>
-                                    <td>{{ pastizal.capacidad_maxima }} animales</td>
+                                    <td>{{ (pastizal.area / 3.5)|round|int if pastizal.area else 0 }} animales</td>
                                 </tr>
                                 <tr>
                                     <th>Animales Actuales:</th>
                                     <td>{{ pastizal.animales_actuales }} animales</td>
                                 </tr>
-                                {% if pastizal.fecha_ultimo_uso %}
-                                <tr>
-                                    <th>Último Uso:</th>
-                                    <td>{{ pastizal.fecha_ultimo_uso.strftime('%d/%m/%Y') }}</td>
-                                </tr>
-                                {% endif %}
-                                {% if pastizal.fecha_disponible %}
-                                <tr>
-                                    <th>Disponible desde:</th>
-                                    <td>{{ pastizal.fecha_disponible.strftime('%d/%m/%Y') }}</td>
-                                </tr>
-                                {% endif %}
+
                             </table>
                         </div>
 
@@ -117,8 +106,8 @@
                                             <td>{{ animal.numero_arete }}</td>
                                             <td>{{ animal.nombre }}</td>
                                             <td>{{ animal.raza }}</td>
-                                            <td>{{ animal.fecha_ingreso.strftime('%d/%m/%Y') }}</td>
-                                            <td>{{ (now - animal.fecha_ingreso).days }}</td>
+                                            <td>{{ animal.fecha_asignacion.strftime('%d/%m/%Y') }}</td>
+                                            <td>{{ (now - animal.fecha_asignacion).days }}</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -148,16 +137,12 @@
                         <input type="text" class="form-control" id="nombre" name="nombre" value="{{ pastizal.nombre }}" required>
                     </div>
                     <div class="mb-3">
-                        <label for="dimension" class="form-label">Dimensión (m²)</label>
-                        <input type="number" step="0.01" class="form-control" id="dimension" name="dimension" value="{{ pastizal.dimension }}" required>
+                        <label for="area" class="form-label">Área (m²)</label>
+                        <input type="number" step="0.01" class="form-control" id="area" name="area" value="{{ pastizal.area }}" required>
                     </div>
                     <div class="mb-3">
-                        <label for="tipo_hierba" class="form-label">Tipo de Hierba</label>
-                        <select class="form-select" id="tipo_hierba" name="tipo_hierba" required>
-                            <option value="Pasto Dallis" {% if pastizal.tipo_hierba == 'Pasto Dallis' %}selected{% endif %}>Pasto Dallis</option>
-                            <option value="Pasto Elefante" {% if pastizal.tipo_hierba == 'Pasto Elefante' %}selected{% endif %}>Pasto Elefante</option>
-                            <option value="Pasto Saboya" {% if pastizal.tipo_hierba == 'Pasto Saboya' %}selected{% endif %}>Pasto Saboya</option>
-                        </select>
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3">{{ pastizal.descripcion }}</textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -182,9 +167,9 @@
                     <div class="mb-3">
                         <label for="estado" class="form-label">Nuevo Estado</label>
                         <select class="form-select" id="estado" name="estado" required>
-                            <option value="Disponible" {% if pastizal.estado == 'Disponible' %}selected{% endif %}>Disponible</option>
-                            <option value="En uso" {% if pastizal.estado == 'En uso' %}selected{% endif %}>En uso</option>
-                            <option value="En regeneración" {% if pastizal.estado == 'En regeneración' %}selected{% endif %}>En regeneración</option>
+                            <option value="Activo" {% if pastizal.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                            <option value="Inactivo" {% if pastizal.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                            <option value="Mantenimiento" {% if pastizal.estado == 'Mantenimiento' %}selected{% endif %}>Mantenimiento</option>
                         </select>
                     </div>
                     <div class="alert alert-info">

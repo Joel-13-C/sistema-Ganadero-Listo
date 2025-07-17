@@ -5,6 +5,7 @@ import mysql.connector
 import sys
 import logging
 from datetime import datetime, timedelta
+import os
 
 # Configurar logging
 logging.basicConfig(
@@ -17,133 +18,75 @@ logger = logging.getLogger(__name__)
 class DatabaseConnection:
     def __init__(self, app):
         try:
-            # Configuración de la base de datos MySQL
+            # Configuración directa de la base de datos MySQL
             app.config['MYSQL_HOST'] = 'localhost'
             app.config['MYSQL_USER'] = 'root'
-            app.config['MYSQL_PASSWORD'] = '1234'  # Contraseña confirmada que funciona
-            app.config['MYSQL_DB'] = 'sistema_ganadero'
+            app.config['MYSQL_PASSWORD'] = 'Cappa100..$$'
+            app.config['MYSQL_DB'] = 'sistema_ganadero2'
             app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
             
-            self.mysql = MySQL(app)
+            # Intentar establecer la conexión
+            self.connection = mysql.connector.connect(
+                host=app.config['MYSQL_HOST'],
+                user=app.config['MYSQL_USER'],
+                password=app.config['MYSQL_PASSWORD'],
+                database=app.config['MYSQL_DB']
+            )
             
-            # Lista de credenciales a intentar para MySQL 8.0
-            credenciales = [
-                # Credenciales con puerto estándar 3306
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'root'},  # Credencial principal según la memoria
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': ''},      # Usuario root sin contraseña
-                {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': 'root'}, # Usando IP en lugar de localhost
-                {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': ''},     # IP con usuario sin contraseña
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'admin'}, # Usuario root con contraseña admin
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': '1234'},  # Usuario root con contraseña 1234
-                
-                # Intentar con otros puertos comunes para MySQL
-                {'host': 'localhost', 'port': 3307, 'user': 'root', 'password': 'root'},  # Puerto alternativo
-                {'host': 'localhost', 'port': 3307, 'user': 'root', 'password': ''},      # Puerto alternativo sin contraseña
-            ]
+            if not self.connection.is_connected():
+                raise Exception("No se pudo establecer la conexión con la base de datos")
             
-            # Intentar cada combinación de credenciales
-            last_error = None
-            connection_successful = False
+            logger.info("Conexión a la base de datos establecida exitosamente")
             
-            for cred in credenciales:
+        except mysql.connector.Error as err:
+            logger.error(f"Error al conectar a la base de datos: {err}")
+            if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
+                raise Exception("Acceso denegado: verifique usuario y contraseña")
+            elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
+                # Intentar crear la base de datos si no existe
                 try:
-                    logger.info(f"Intentando conectar a {cred['host']}:{cred['port']} con usuario: {cred['user']} y contraseña: {'[vacía]' if cred['password'] == '' else '[presente]'}")
-                    
-                    # Actualizar la configuración de Flask-MySQL
-                    app.config['MYSQL_HOST'] = cred['host']
-                    app.config['MYSQL_USER'] = cred['user']
-                    app.config['MYSQL_PASSWORD'] = cred['password']
-                    
-                    # Intentar conexión directa con mysql.connector
-                    self.connection = mysql.connector.connect(
-                        host=cred['host'],
-                        port=cred['port'],
-                        user=cred['user'],
-                        password=cred['password'],
-                        database='sistema_ganadero'
+                    temp_conn = mysql.connector.connect(
+                        host=app.config['MYSQL_HOST'],
+                        user=app.config['MYSQL_USER'],
+                        password=app.config['MYSQL_PASSWORD']
                     )
+                    cursor = temp_conn.cursor()
+                    cursor.execute(f"CREATE DATABASE {app.config['MYSQL_DB']}")
+                    cursor.close()
+                    temp_conn.close()
                     
-                    if not self.connection:
-                        raise mysql.connector.Error("No se pudo establecer conexión con la base de datos")
-                    
-                    logger.info(f"Conexión a la base de datos establecida exitosamente con {cred['host']}:{cred['port']} y usuario: {cred['user']}")
-                    connection_successful = True
-                    break
-                
-                except mysql.connector.Error as err:
-                    last_error = err
-                    logger.warning(f"Intento fallido con {cred['host']}:{cred['port']} y usuario: {cred['user']} - Error: {err}")
-            
-            if not connection_successful:
-                # Clasificar y manejar diferentes tipos de errores del último intento
-                if last_error.errno == mysql.connector.errorcode.CR_CONN_HOST_ERROR:
-                    logger.error("No se puede conectar al host. Verifique que el servidor MySQL esté corriendo.")
-                elif last_error.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
-                    logger.error("Acceso denegado. Verifique usuario y contraseña.")
-                elif last_error.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-                    logger.error("La base de datos no existe. Necesita crearla.")
-                
-                self.connection = None
-                raise ConnectionError(f"Error de conexión a la base de datos: {last_error}")
-        
+                    # Intentar conectar nuevamente
+                    self.connection = mysql.connector.connect(
+                        host=app.config['MYSQL_HOST'],
+                        user=app.config['MYSQL_USER'],
+                        password=app.config['MYSQL_PASSWORD'],
+                        database=app.config['MYSQL_DB']
+                    )
+                    logger.info("Base de datos creada y conexión establecida exitosamente")
+                except mysql.connector.Error as e:
+                    raise Exception(f"Error al crear la base de datos: {e}")
+            else:
+                raise Exception(f"Error de conexión: {err}")
         except Exception as e:
-            logger.critical(f"Error fatal al inicializar la base de datos: {e}")
-            logger.critical(f"Detalles del error: {sys.exc_info()}")
-            self.connection = None
+            logger.error(f"Error general al inicializar la base de datos: {e}")
             raise
 
     def get_connection(self):
         """
-        Método para obtener una conexión segura a la base de datos.
-        Reintenta la conexión si está cerrada usando diferentes credenciales.
+        Obtiene una conexión a la base de datos, reconectando si es necesario
         """
-        if not self.connection or not self.connection.is_connected():
-            logger.warning("Conexión perdida. Reintentando conexión...")
-            
-            # Lista de credenciales a intentar para MySQL 8.0
-            credenciales = [
-                # Credenciales con puerto estándar 3306
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'root'},  # Credencial principal según la memoria
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': ''},      # Usuario root sin contraseña
-                {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': 'root'}, # Usando IP en lugar de localhost
-                {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': ''},     # IP con usuario sin contraseña
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'admin'}, # Usuario root con contraseña admin
-                {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': '1234'},  # Usuario root con contraseña 1234
-                
-                # Intentar con otros puertos comunes para MySQL
-                {'host': 'localhost', 'port': 3307, 'user': 'root', 'password': 'root'},  # Puerto alternativo
-                {'host': 'localhost', 'port': 3307, 'user': 'root', 'password': ''},      # Puerto alternativo sin contraseña
-            ]
-            
-            # Intentar cada combinación de credenciales
-            last_error = None
-            connection_successful = False
-            
-            for cred in credenciales:
-                try:
-                    logger.info(f"Intentando reconectar a {cred['host']}:{cred['port']} con usuario: {cred['user']} y contraseña: {'[vacía]' if cred['password'] == '' else '[presente]'}")
-                    
-                    self.connection = mysql.connector.connect(
-                        host=cred['host'],
-                        port=cred['port'],
-                        user=cred['user'],
-                        password=cred['password'],
-                        database='sistema_ganadero'
-                    )
-                    
-                    logger.info(f"Reconexión exitosa con {cred['host']}:{cred['port']} y usuario: {cred['user']}")
-                    connection_successful = True
-                    break
-                
-                except mysql.connector.Error as err:
-                    last_error = err
-                    logger.warning(f"Intento de reconexión fallido con {cred['host']}:{cred['port']} y usuario: {cred['user']} - Error: {err}")
-            
-            if not connection_successful:
-                logger.error(f"No se pudo reconectar con ninguna credencial. Último error: {last_error}")
-                raise ConnectionError("No se pudo restablecer la conexión a la base de datos")
-        
-        return self.connection
+        try:
+            if not hasattr(self, 'connection') or not self.connection.is_connected():
+                self.connection = mysql.connector.connect(
+                    host='localhost',
+                    user='root',
+                    password='Cappa100..$$',
+                    database='sistema_ganadero2'
+                )
+            return self.connection
+        except mysql.connector.Error as err:
+            logger.error(f"Error al obtener conexión: {err}")
+            raise Exception("No se pudo establecer la conexión con la base de datos")
 
     @staticmethod
     def hash_password(password):
@@ -151,22 +94,39 @@ class DatabaseConnection:
         return hashlib.sha256(password.encode()).hexdigest()
 
     def validate_user(self, username, password):
+        """
+        Valida las credenciales del usuario
+        """
         try:
             connection = self.get_connection()
-            hashed_password = self.hash_password(password)
             
             with connection.cursor(dictionary=True) as cursor:
-                cursor.execute("SELECT * FROM usuarios WHERE username = %s AND password = %s", (username, hashed_password))
+                # Primero intentamos con la contraseña sin hash
+                cursor.execute("""
+                    SELECT * FROM usuarios 
+                    WHERE username = %s AND password = %s
+                """, (username, password))
                 user = cursor.fetchone()
                 
                 if not user:
-                    logger.info(f"Intento de inicio de sesión fallido para el usuario: {username}")
+                    # Si no funciona, intentamos con el hash
+                    hashed_password = self.hash_password(password)
+                    cursor.execute("""
+                        SELECT * FROM usuarios 
+                        WHERE username = %s AND password = %s
+                    """, (username, hashed_password))
+                    user = cursor.fetchone()
                 
+                if not user:
+                    logger.info(f"Intento de inicio de sesión fallido para el usuario: {username}")
+                    return None
+                
+                logger.info(f"Inicio de sesión exitoso para el usuario: {username}")
                 return user
-        
+                
         except mysql.connector.Error as err:
             logger.error(f"Error al validar usuario: {err}")
-            raise
+            raise Exception("Error al validar las credenciales del usuario")
     
     def register_user(self, username, email, password):
         try:
@@ -662,10 +622,10 @@ class DatabaseConnection:
                 
                 gestaciones = cursor.fetchall()
                 
-                # Calcular fecha probable de parto (283 días después de la inseminación)
+                # Calcular fecha probable de parto (283 días después de la monta)
                 for g in gestaciones:
-                    if g['fecha_inseminacion']:
-                        g['fecha_probable_parto'] = g['fecha_inseminacion'] + timedelta(days=283)
+                    if g['fecha_monta']:
+                        g['fecha_probable_parto'] = g['fecha_monta'] + timedelta(days=283)
                 
                 return gestaciones
         
@@ -736,8 +696,8 @@ def get_db_connection():
     # Lista de credenciales a intentar para MySQL 8.0
     credenciales = [
         # Credenciales con puerto estándar 3306
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': '1234'},  # Credencial principal confirmada
-        {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': '1234'}, # Usando IP en lugar de localhost
+        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'Cappa100..$$'},  # Credencial principal confirmada
+        {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': 'Cappa100..$$'}, # Usando IP en lugar de localhost
         {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'root'},  # Credencial alternativa
         {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': ''},      # Usuario root sin contraseña
         {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': 'root'}, # Usando IP con contraseña alternativa
@@ -745,8 +705,8 @@ def get_db_connection():
         {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'admin'}, # Usuario root con contraseña admin
         
         # Intentar con otros puertos comunes para MySQL
-        {'host': 'localhost', 'port': 3307, 'user': 'root', 'password': 'root'},  # Puerto alternativo
-        {'host': 'localhost', 'port': 3307, 'user': 'root', 'password': ''},      # Puerto alternativo sin contraseña
+        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'root'},  # Puerto alternativo
+        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': ''},      # Puerto alternativo sin contraseña
     ]
     
     last_error = None
@@ -760,7 +720,7 @@ def get_db_connection():
                 port=cred['port'],
                 user=cred['user'],
                 password=cred['password'],
-                database='sistema_ganadero'
+                database='sistema_ganadero2'
             )
             logger.info(f"Conexión exitosa con {cred['host']}:{cred['port']} y usuario: {cred['user']}")
             return connection
@@ -778,10 +738,10 @@ def get_db_connection():
             host='localhost',
             port=3306,
             user='root',
-            password='1234'
+            password='Cappa100..$$',
         )
         cursor = connection.cursor()
-        cursor.execute("CREATE DATABASE IF NOT EXISTS sistema_ganadero")
+        cursor.execute("CREATE DATABASE IF NOT EXISTS sistema_ganadero2")
         cursor.close()
         connection.close()
         
@@ -790,8 +750,8 @@ def get_db_connection():
             host='localhost',
             port=3306,
             user='root',
-            password='1234',
-            database='sistema_ganadero'
+            password='Cappa100..$$',
+            database='sistema_ganadero2'
         )
         logger.info("Base de datos creada y conexión establecida exitosamente")
         return connection

@@ -189,7 +189,7 @@
                                 </div>
                             </td>
                             <td>$ {{ "%.2f"|format(venta.precio_litro) }}</td>
-                            <td class="font-weight-bold">$ {{ "%.2f"|format(venta.total_venta) }}</td>
+                            <td class="font-weight-bold">$ {{ "%.2f"|format(venta.total) }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
                                     <div class="icon-circle bg-primary bg-opacity-10 me-2">
@@ -551,7 +551,7 @@ function verDetallesVenta(id) {
                             </div>
                             <div class="col-6">
                                 <p class="mb-1"><strong><i class="fas fa-dollar-sign me-2"></i>Total:</strong></p>
-                                <p class="mb-3 h5 text-${estadoColor}">$ ${data.total_venta.toFixed(2)}</p>
+                                <p class="mb-3 h5 text-${estadoColor}">$ ${data.total.toFixed(2)}</p>
                                 
                                 <p class="mb-1"><strong><i class="fas fa-user me-2"></i>Comprador:</strong></p>
                                 <p class="mb-3">${data.comprador}</p>
@@ -606,7 +606,7 @@ function verDetallesVenta(id) {
                                         <p><strong>Precio por litro:</strong> $ ${data.precio_litro.toFixed(2)}</p>
                                     </div>
                                     <div class="col-6">
-                                        <p><strong>Total:</strong> $ ${data.total_venta.toFixed(2)}</p>
+                                        <p><strong>Total:</strong> $ ${data.total.toFixed(2)}</p>
                                         <p><strong>Comprador:</strong> ${data.comprador}</p>
                                         <p><strong>Forma de pago:</strong> ${data.forma_pago}</p>
                                         <p><strong>Estado del pago:</strong> ${data.estado_pago}</p>

@@ -48,7 +48,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase mb-1">Líneas Completas</h6>
-                            <h2 class="mb-0">{{ genealogia|selectattr('padre_nombre')|selectattr('madre_nombre')|list|length }}</h2>
+                            <h2 class="mb-0">{{ genealogia|selectattr('padre_arete')|selectattr('madre_arete')|list|length }}</h2>
                         </div>
                         <div class="icon-circle bg-white bg-opacity-25">
                             <i class="fas fa-check-circle fa-2x text-white"></i>
@@ -63,7 +63,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase mb-1">Solo Padre</h6>
-                            <h2 class="mb-0">{{ genealogia|selectattr('padre_nombre')|rejectattr('madre_nombre')|list|length }}</h2>
+                            <h2 class="mb-0">{{ genealogia|selectattr('padre_arete')|rejectattr('madre_arete')|list|length }}</h2>
                         </div>
                         <div class="icon-circle bg-white bg-opacity-25">
                             <i class="fas fa-male fa-2x text-white"></i>
@@ -78,7 +78,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase mb-1">Solo Madre</h6>
-                            <h2 class="mb-0">{{ genealogia|rejectattr('padre_nombre')|selectattr('madre_nombre')|list|length }}</h2>
+                            <h2 class="mb-0">{{ genealogia|rejectattr('padre_arete')|selectattr('madre_arete')|list|length }}</h2>
                         </div>
                         <div class="icon-circle bg-white bg-opacity-25">
                             <i class="fas fa-female fa-2x text-white"></i>
@@ -140,9 +140,11 @@
                     <thead class="table-light">
                         <tr>
                             <th>Animal</th>
-                            <th>Padre</th>
-                            <th>Madre</th>
-                            <th>Características Heredadas</th>
+                            <th>Padre (Arete)</th>
+                            <th>Madre (Arete)</th>
+                            <th>Abuelos Paternos</th>
+                            <th>Abuelos Maternos</th>
+                            <th>Observaciones</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -158,36 +160,64 @@
                                 </div>
                             </td>
                             <td>
-                                {% if gen.padre_nombre %}
+                                {% if gen.padre_arete %}
                                 <div class="d-flex align-items-center">
                                     <div class="icon-circle bg-primary bg-opacity-10 me-2">
                                         <i class="fas fa-male text-primary"></i>
                                     </div>
-                                    <span>{{ gen.padre_nombre }}</span>
+                                    <span>{{ gen.padre_arete }}</span>
                                 </div>
                                 {% else %}
                                 <span class="text-muted"><i class="fas fa-question-circle me-1"></i>No registrado</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if gen.madre_nombre %}
+                                {% if gen.madre_arete %}
                                 <div class="d-flex align-items-center">
                                     <div class="icon-circle bg-danger bg-opacity-10 me-2">
                                         <i class="fas fa-female text-danger"></i>
                                     </div>
-                                    <span>{{ gen.madre_nombre }}</span>
+                                    <span>{{ gen.madre_arete }}</span>
                                 </div>
                                 {% else %}
                                 <span class="text-muted"><i class="fas fa-question-circle me-1"></i>No registrada</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if gen.caracteristicas_heredadas %}
-                                <span class="text-truncate d-inline-block" style="max-width: 250px;" data-bs-toggle="tooltip" title="{{ gen.caracteristicas_heredadas }}">
-                                    {{ gen.caracteristicas_heredadas }}
+                                {% if gen.abuelo_paterno_arete or gen.abuela_paterna_arete %}
+                                <div class="small">
+                                    {% if gen.abuelo_paterno_arete %}
+                                    <div><i class="fas fa-male text-primary"></i> {{ gen.abuelo_paterno_arete }}</div>
+                                    {% endif %}
+                                    {% if gen.abuela_paterna_arete %}
+                                    <div><i class="fas fa-female text-danger"></i> {{ gen.abuela_paterna_arete }}</div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">No registrados</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if gen.abuelo_materno_arete or gen.abuela_materna_arete %}
+                                <div class="small">
+                                    {% if gen.abuelo_materno_arete %}
+                                    <div><i class="fas fa-male text-primary"></i> {{ gen.abuelo_materno_arete }}</div>
+                                    {% endif %}
+                                    {% if gen.abuela_materna_arete %}
+                                    <div><i class="fas fa-female text-danger"></i> {{ gen.abuela_materna_arete }}</div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">No registrados</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if gen.observaciones %}
+                                <span class="text-truncate d-inline-block" style="max-width: 200px;" data-bs-toggle="tooltip" title="{{ gen.observaciones }}">
+                                    {{ gen.observaciones }}
                                 </span>
                                 {% else %}
-                                <span class="text-muted">Sin características registradas</span>
+                                <span class="text-muted">Sin observaciones</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -229,26 +259,32 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="padre_id" class="form-label">Padre</label>
-                        <select class="form-select" id="padre_id" name="padre_id">
-                            <option value="">Seleccione el padre</option>
-                            {% for animal in animales %}
-                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
-                            {% endfor %}
-                        </select>
+                        <label for="padre_arete" class="form-label">Padre (Número de Arete)</label>
+                        <input type="text" class="form-control" id="padre_arete" name="padre_arete" placeholder="Número de arete del padre">
                     </div>
                     <div class="mb-3">
-                        <label for="madre_id" class="form-label">Madre</label>
-                        <select class="form-select" id="madre_id" name="madre_id">
-                            <option value="">Seleccione la madre</option>
-                            {% for animal in animales %}
-                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
-                            {% endfor %}
-                        </select>
+                        <label for="madre_arete" class="form-label">Madre (Número de Arete)</label>
+                        <input type="text" class="form-control" id="madre_arete" name="madre_arete" placeholder="Número de arete de la madre">
                     </div>
                     <div class="mb-3">
-                        <label for="caracteristicas_heredadas" class="form-label">Características Heredadas</label>
-                        <textarea class="form-control" id="caracteristicas_heredadas" name="caracteristicas_heredadas" rows="3"></textarea>
+                        <label for="abuelo_paterno_arete" class="form-label">Abuelo Paterno (Número de Arete)</label>
+                        <input type="text" class="form-control" id="abuelo_paterno_arete" name="abuelo_paterno_arete" placeholder="Número de arete del abuelo paterno">
+                    </div>
+                    <div class="mb-3">
+                        <label for="abuela_paterna_arete" class="form-label">Abuela Paterna (Número de Arete)</label>
+                        <input type="text" class="form-control" id="abuela_paterna_arete" name="abuela_paterna_arete" placeholder="Número de arete de la abuela paterna">
+                    </div>
+                    <div class="mb-3">
+                        <label for="abuelo_materno_arete" class="form-label">Abuelo Materno (Número de Arete)</label>
+                        <input type="text" class="form-control" id="abuelo_materno_arete" name="abuelo_materno_arete" placeholder="Número de arete del abuelo materno">
+                    </div>
+                    <div class="mb-3">
+                        <label for="abuela_materna_arete" class="form-label">Abuela Materna (Número de Arete)</label>
+                        <input type="text" class="form-control" id="abuela_materna_arete" name="abuela_materna_arete" placeholder="Número de arete de la abuela materna">
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3" placeholder="Observaciones sobre la genealogía"></textarea>
                     </div>
                 </form>
             </div>
@@ -279,26 +315,32 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="edit_padre_id" class="form-label">Padre</label>
-                        <select class="form-select" id="edit_padre_id" name="padre_id">
-                            <option value="">Seleccione el padre</option>
-                            {% for animal in animales %}
-                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
-                            {% endfor %}
-                        </select>
+                        <label for="edit_padre_arete" class="form-label">Padre (Número de Arete)</label>
+                        <input type="text" class="form-control" id="edit_padre_arete" name="padre_arete" placeholder="Número de arete del padre">
                     </div>
                     <div class="mb-3">
-                        <label for="edit_madre_id" class="form-label">Madre</label>
-                        <select class="form-select" id="edit_madre_id" name="madre_id">
-                            <option value="">Seleccione la madre</option>
-                            {% for animal in animales %}
-                                <option value="{{ animal.id }}">{{ animal.nombre }}</option>
-                            {% endfor %}
-                        </select>
+                        <label for="edit_madre_arete" class="form-label">Madre (Número de Arete)</label>
+                        <input type="text" class="form-control" id="edit_madre_arete" name="madre_arete" placeholder="Número de arete de la madre">
                     </div>
                     <div class="mb-3">
-                        <label for="edit_caracteristicas_heredadas" class="form-label">Características Heredadas</label>
-                        <textarea class="form-control" id="edit_caracteristicas_heredadas" name="caracteristicas_heredadas" rows="3"></textarea>
+                        <label for="edit_abuelo_paterno_arete" class="form-label">Abuelo Paterno (Número de Arete)</label>
+                        <input type="text" class="form-control" id="edit_abuelo_paterno_arete" name="abuelo_paterno_arete" placeholder="Número de arete del abuelo paterno">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_abuela_paterna_arete" class="form-label">Abuela Paterna (Número de Arete)</label>
+                        <input type="text" class="form-control" id="edit_abuela_paterna_arete" name="abuela_paterna_arete" placeholder="Número de arete de la abuela paterna">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_abuelo_materno_arete" class="form-label">Abuelo Materno (Número de Arete)</label>
+                        <input type="text" class="form-control" id="edit_abuelo_materno_arete" name="abuelo_materno_arete" placeholder="Número de arete del abuelo materno">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_abuela_materna_arete" class="form-label">Abuela Materna (Número de Arete)</label>
+                        <input type="text" class="form-control" id="edit_abuela_materna_arete" name="abuela_materna_arete" placeholder="Número de arete de la abuela materna">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="edit_observaciones" name="observaciones" rows="3" placeholder="Observaciones sobre la genealogía"></textarea>
                     </div>
                 </form>
             </div>
@@ -325,9 +367,9 @@ function verDetallesGenealogia(id) {
         })
         .then(data => {
             // Crear contenido para SweetAlert2
-            let caracteristicas = data.caracteristicas_heredadas || 'Sin características registradas';
-            let padre = data.padre_nombre || 'No registrado';
-            let madre = data.madre_nombre || 'No registrada';
+            let observaciones = data.observaciones || 'Sin observaciones registradas';
+            let padre = data.padre_arete || 'No registrado';
+            let madre = data.madre_arete || 'No registrada';
             
             Swal.fire({
                 title: `Genealogía de ${data.nombre_animal}`,
@@ -344,8 +386,8 @@ function verDetallesGenealogia(id) {
                             <p class="mb-1"><strong>Madre:</strong> ${madre}</p>
                         </div>
                         <div>
-                            <h6 class="text-primary">Características Heredadas</h6>
-                            <p>${caracteristicas}</p>
+                            <h6 class="text-primary">Observaciones</h6>
+                            <p>${observaciones}</p>
                         </div>
                     </div>
                 `,
@@ -375,9 +417,13 @@ function editarGenealogia(id) {
         })
         .then(data => {
             document.getElementById('edit_animal_id').value = data.animal_id;
-            document.getElementById('edit_padre_id').value = data.padre_id || '';
-            document.getElementById('edit_madre_id').value = data.madre_id || '';
-            document.getElementById('edit_caracteristicas_heredadas').value = data.caracteristicas_heredadas || '';
+            document.getElementById('edit_padre_arete').value = data.padre_arete || '';
+            document.getElementById('edit_madre_arete').value = data.madre_arete || '';
+            document.getElementById('edit_abuelo_paterno_arete').value = data.abuelo_paterno_arete || '';
+            document.getElementById('edit_abuela_paterna_arete').value = data.abuela_paterna_arete || '';
+            document.getElementById('edit_abuelo_materno_arete').value = data.abuelo_materno_arete || '';
+            document.getElementById('edit_abuela_materna_arete').value = data.abuela_materna_arete || '';
+            document.getElementById('edit_observaciones').value = data.observaciones || '';
             
             const modal = new bootstrap.Modal(document.getElementById('modalEditarGenealogia'));
             modal.show();

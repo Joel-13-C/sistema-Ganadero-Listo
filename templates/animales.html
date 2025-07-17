@@ -101,7 +101,7 @@
                  data-sexo="{{ animal.sexo }}">
                 <div class="card animal-card">
                     <div class="card-badge {% if animal.condicion in ['Toro', 'Torete'] %}badge-primary{% elif animal.condicion in ['Vaca', 'Vacona'] %}badge-success{% else %}badge-warning{% endif %}">{{ animal.condicion }}</div>
-                    <img src="{{ animal.foto_path if animal.foto_path.startswith('/static/') or animal.foto_path.startswith('static/') else '/' + animal.foto_path }}" 
+                    <img src="{{ animal.foto_path if 'cloudinary' in animal.foto_path or animal.foto_path.startswith('/static/') or animal.foto_path.startswith('static/') else '/' + animal.foto_path }}" 
                          class="card-img-top" 
                          alt="{{ animal.nombre }}"
                          onerror="this.src='/static/images/upload-image-placeholder.svg'">

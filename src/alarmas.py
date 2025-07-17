@@ -4,6 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 import logging
 from flask import session
+import os
 
 # Configurar logger
 logger = logging.getLogger('alarmas')
@@ -21,13 +22,13 @@ class SistemaAlarmas:
         """
         self.db_connection = db_connection
         
-        # Configuración de correo electrónico fija para evitar pérdida al reiniciar
+        # Configuración directa de correo electrónico
         self.email_config = {
             'smtp_server': 'smtp.gmail.com',
             'port': 587,
-            'username': 'fernando05calero@gmail.com',  # Correo configurado directamente
-            'password': 'mqsl wlvi usjb kfzl',  # Contraseña de aplicación configurada directamente
-            'from_email': 'fernando05calero@gmail.com'
+            'username': 'p2pacademy.oficial@gmail.com',
+            'password': 'dtnf whvj oycf nhbb',
+            'from_email': 'p2pacademy.oficial@gmail.com'
         }
         
         self._crear_tabla_si_no_existe()
@@ -35,35 +36,9 @@ class SistemaAlarmas:
     def _crear_tabla_si_no_existe(self):
         """Crea la tabla de alarmas si no existe"""
         try:
-            print("\n==== VERIFICANDO TABLAS DE ALARMAS ====\n")
-            
-            # Intentar diferentes configuraciones de conexión
-            conexiones_a_probar = [
-                {"host": "localhost", "user": "root", "password": "1234"},  # Contraseña confirmada que funciona
-                {"host": "localhost", "user": "root", "password": ""},
-                {"host": "localhost", "user": "root", "password": "root"},
-                {"host": "localhost", "user": "root", "password": "admin"},
-                {"host": "localhost", "user": "admin", "password": "admin"}
-            ]
-            
-            conn = None
-            for config in conexiones_a_probar:
-                try:
-                    import mysql.connector
-                    conn = mysql.connector.connect(
-                        **config,
-                        database="sistema_ganadero"
-                    )
-                    if conn.is_connected():
-                        print(f"Conexión exitosa con: {config}")
-                        break
-                except Exception as e:
-                    print(f"Error al conectar con: {config}. Error: {e}")
-                    continue
-            
-            if not conn or not conn.is_connected():
+            conn = self.db_connection()
+            if not conn:
                 logger.error("No se pudo conectar a la base de datos para crear tabla de alarmas")
-                print("Error: No se pudo conectar a la base de datos")
                 return
                 
             cursor = conn.cursor()
@@ -72,42 +47,27 @@ class SistemaAlarmas:
             cursor.execute("""
                 SELECT COUNT(*) 
                 FROM information_schema.tables 
-                WHERE table_schema = 'sistema_ganadero' 
+                WHERE table_schema = 'sistema_ganadero2'
                 AND table_name = 'config_alarmas'
             """)
-            tabla_existe = cursor.fetchone()[0] > 0
-            print(f"¿Existe la tabla config_alarmas?: {tabla_existe}")
             
-            # Tabla para configuración de alarmas
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS config_alarmas (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    usuario_id INT NOT NULL,
-                    tipo VARCHAR(50) NOT NULL,
-                    dias_anticipacion INT DEFAULT 7,
-                    email VARCHAR(100) NOT NULL,
-                    activo BOOLEAN DEFAULT TRUE,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Tabla para registro de alarmas enviadas
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS alarmas_enviadas (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    tipo VARCHAR(50) NOT NULL,
-                    referencia_id INT,
-                    email VARCHAR(100) NOT NULL,
-                    mensaje TEXT,
-                    fecha_envio DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            print("Tablas de alarmas verificadas/creadas correctamente")
+            if cursor.fetchone()[0] == 0:
+                # Crear tabla si no existe
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS config_alarmas (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        usuario_id INT NOT NULL,
+                        tipo VARCHAR(50) NOT NULL,
+                        dias_anticipacion INT DEFAULT 7,
+                        activo BOOLEAN DEFAULT TRUE,
+                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                    )
+                """)
+                conn.commit()
+                logger.info("Tabla de alarmas creada correctamente")
             
         except Exception as e:
-            logger.error(f"Error al crear tablas de alarmas: {e}")
-            print(f"Error al crear tablas de alarmas: {e}")
+            logger.error(f"Error al crear tabla de alarmas: {e}")
         finally:
             if 'cursor' in locals() and cursor:
                 cursor.close()
@@ -322,15 +282,12 @@ class SistemaAlarmas:
                 
                 # Buscar desparasitaciones pendientes
                 query = """
-                    SELECT d.*, GROUP_CONCAT(a.id) as animal_ids, 
-                           GROUP_CONCAT(a.nombre) as nombres_animales,
-                           GROUP_CONCAT(a.numero_arete) as aretes_animales
-                    FROM desparasitacion d
-                    JOIN desparasitacion_animal da ON d.id = da.desparasitacion_id
-                    JOIN animales a ON da.animal_id = a.id
-                    WHERE d.proxima_aplicacion <= %s
-                    AND d.proxima_aplicacion >= CURDATE()
-                    GROUP BY d.id
+                    SELECT d.*, a.nombre as nombre_animal, a.numero_arete as arete_animal
+                    FROM desparasitaciones d
+                    JOIN animales a ON d.animal_id = a.id
+                    WHERE d.fecha_proxima <= %s
+                    AND d.fecha_proxima >= CURDATE()
+                    AND d.usuario_id = %s
                 """
                 
                 print(f"Ejecutando consulta: {query}")
@@ -355,16 +312,7 @@ class SistemaAlarmas:
                     # Enviar notificaciones para estas desparasitaciones
                     for desparasitacion in desparasitaciones:
                         # Calcular días restantes
-                        dias_restantes = (desparasitacion['proxima_aplicacion'] - datetime.now().date()).days
-                        
-                        # Preparar lista de animales
-                        nombres_animales = desparasitacion['nombres_animales'].split(',') if desparasitacion['nombres_animales'] else []
-                        aretes_animales = desparasitacion['aretes_animales'].split(',') if desparasitacion['aretes_animales'] else []
-                        
-                        # Crear lista formateada de animales
-                        lista_animales = ""
-                        for i in range(min(len(nombres_animales), len(aretes_animales))):
-                            lista_animales += f"- {nombres_animales[i]} (Arete: {aretes_animales[i]})\n"
+                        dias_restantes = (desparasitacion['fecha_proxima'] - datetime.now().date()).days
                         
                         # Preparar el asunto del correo
                         asunto = f"ALERTA: Desparasitación pendiente - {desparasitacion['producto']} en {dias_restantes} días"
@@ -376,12 +324,10 @@ class SistemaAlarmas:
                         Hay una desparasitación programada próximamente.
                         
                         Detalles:
+                        - Animal: {desparasitacion['nombre_animal']} (Arete: {desparasitacion['arete_animal']})
                         - Producto: {desparasitacion['producto']}
-                        - Fecha de aplicación: {desparasitacion['proxima_aplicacion'].strftime('%d/%m/%Y')}
+                        - Fecha de aplicación: {desparasitacion['fecha_proxima'].strftime('%d/%m/%Y')}
                         - Días restantes: {dias_restantes}
-                        
-                        Animales que requieren desparasitación:
-                        {lista_animales}
                         
                         Por favor, prepare todo lo necesario para realizar la desparasitación.
                         """
@@ -609,29 +555,28 @@ class SistemaAlarmas:
                 email = config['email']
                 
                 # Calcular la fecha límite
-                from datetime import datetime, timedelta
                 fecha_limite = datetime.now() + timedelta(days=dias_anticipacion)
                 
                 # Imprimir información de depuración
                 print(f"Buscando vacunaciones para usuario_id: {usuario_id}, con fecha límite: {fecha_limite.strftime('%Y-%m-%d')}")
                 
-                # Buscar vacunaciones pendientes
+                # Buscar todas las vacunaciones pendientes
                 query = """
-                    SELECT v.*, GROUP_CONCAT(a.id) as animal_ids, 
-                           GROUP_CONCAT(a.nombre) as nombres_animales,
-                           GROUP_CONCAT(a.numero_arete) as aretes_animales
-                    FROM vacuna v
-                    JOIN vacuna_animal va ON v.id = va.vacuna_id
-                    JOIN animales a ON va.animal_id = a.id
-                    WHERE v.proxima_aplicacion <= %s
-                    AND v.proxima_aplicacion >= CURDATE()
-                    GROUP BY v.id
+                    SELECT rv.*, a.nombre as nombre_animal,
+                           a.numero_arete as arete_animal,
+                           v.nombre as tipo_vacuna
+                    FROM registro_vacunas rv
+                    JOIN animales a ON rv.animal_id = a.id
+                    JOIN vacunas v ON rv.vacuna_id = v.id
+                    WHERE rv.fecha_proxima <= %s
+                    AND rv.fecha_proxima >= CURDATE()
+                    AND rv.usuario_id = %s
                 """
                 
                 print(f"Ejecutando consulta: {query}")
-                print(f"Con parámetros: {fecha_limite.strftime('%Y-%m-%d')}")
+                print(f"Con parámetros: {fecha_limite.strftime('%Y-%m-%d')}, {usuario_id}")
                 
-                cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'),))
+                cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'), usuario_id))
                 
                 vacunaciones = cursor.fetchall()
                 print(f"Vacunaciones pendientes encontradas: {len(vacunaciones)}")
@@ -639,83 +584,203 @@ class SistemaAlarmas:
                 if vacunaciones:
                     print("\n==== DETALLES DE VACUNACIONES PENDIENTES ====")
                     for v in vacunaciones:
-                        dias_restantes = (v['proxima_aplicacion'] - datetime.now().date()).days
-                        print(f"Vacunación: ID={v['id']}, Vacuna={v['nombre']}")
-                        print(f"  Fecha próxima aplicación: {v['proxima_aplicacion']}")
-                        print(f"  Días restantes: {dias_restantes}")
-                        print(f"  Animales: {v['nombres_animales']}")
+                        print(f"Animal: {v['nombre_animal']} (Arete: {v['arete_animal']})")
+                        print(f"  Tipo de vacuna: {v['tipo_vacuna']}")
+                        print(f"  Fecha próxima: {v['fecha_proxima']}")
                         print("  ----------------------------------------")
                 
-                if vacunaciones:
-                    # Enviar notificaciones para estas vacunaciones
-                    for vacunacion in vacunaciones:
-                        # Calcular días restantes
-                        dias_restantes = (vacunacion['proxima_aplicacion'] - datetime.now().date()).days
-                        
-                        # Preparar lista de animales
-                        nombres_animales = vacunacion['nombres_animales'].split(',') if vacunacion['nombres_animales'] else []
-                        aretes_animales = vacunacion['aretes_animales'].split(',') if vacunacion['aretes_animales'] else []
-                        
-                        # Crear lista formateada de animales
-                        lista_animales = ""
-                        for i in range(min(len(nombres_animales), len(aretes_animales))):
-                            lista_animales += f"- {nombres_animales[i]} (Arete: {aretes_animales[i]})\n"
-                        
-                        # Preparar el asunto del correo
-                        asunto = f"ALERTA: Vacunación pendiente - {vacunacion['nombre']} en {dias_restantes} días"
-                        
-                        # Preparar el mensaje del correo
-                        mensaje = f"""
-                        ALERTA DE VACUNACIÓN PENDIENTE
-                        
-                        Hay una vacunación programada próximamente.
-                        
-                        Detalles:
-                        - Vacuna: {vacunacion['nombre']}
-                        - Fecha de aplicación: {vacunacion['proxima_aplicacion'].strftime('%d/%m/%Y')}
-                        - Días restantes: {dias_restantes}
-                        
-                        Animales que requieren vacunación:
-                        {lista_animales}
-                        
-                        Por favor, prepare todo lo necesario para realizar la vacunación.
-                        """
-                        
-                        # Enviar la notificación
-                        print(f"Enviando notificación de vacunación a {email}:")
-                        print(f"Asunto: {asunto}")
-                        print(f"Descripción: {mensaje}")
-                        
-                        enviado = self._enviar_notificacion_email(email, asunto, mensaje)
-                        
-                        if enviado:
-                            # Registrar la notificación en la base de datos
-                            try:
-                                cursor.execute("""
-                                    INSERT INTO alarmas_enviadas
-                                    (tipo, referencia_id, email, mensaje, fecha_envio)
-                                    VALUES (%s, %s, %s, %s, NOW())
-                                """, (
-                                    'vacunacion',
-                                    vacunacion['id'],
-                                    email,
-                                    mensaje
-                                ))
-                                conn.commit()
-                                notificaciones_enviadas += 1
-                                print(f"Notificación registrada en la base de datos. Total enviadas: {notificaciones_enviadas}")
-                            except Exception as e:
-                                print(f"Error al registrar notificación: {e}")
-            
-            print(f"\n==== VERIFICACIÓN DE VACUNACIONES PENDIENTES FINALIZADA ====")
-            print(f"Total de notificaciones enviadas: {notificaciones_enviadas}")
-            
-            return notificaciones_enviadas
+                # Procesar cada vacunación
+                for vacunacion in vacunaciones:
+                    tipo = vacunacion['tipo_vacuna']
+                    nombre_animal = vacunacion['nombre_animal']
+                    arete_animal = vacunacion['arete_animal']
+                    
+                    # Crear mensaje
+                    asunto = f"Recordatorio de Vacunación - {tipo}"
+                    mensaje = f"""
+                    Recordatorio de vacunación próxima:
+                    
+                    Tipo: {tipo}
+                    Fecha programada: {vacunacion['fecha_proxima']}
+                    
+                    Animal a vacunar:
+                    - {nombre_animal} (Arete: {arete_animal})
+                    
+                    Observaciones: {vacunacion['observaciones'] if vacunacion['observaciones'] else 'Ninguna'}
+                    """
+                    
+                    # Enviar la notificación
+                    print(f"Enviando notificación de vacunación a {email}:")
+                    print(f"Asunto: {asunto}")
+                    print(f"Descripción: {mensaje}")
+                    
+                    enviado = self._enviar_notificacion_email(email, asunto, mensaje)
+                    
+                    if enviado:
+                        # Registrar la notificación en la base de datos
+                        try:
+                            cursor.execute("""
+                                INSERT INTO alarmas_enviadas
+                                (tipo, referencia_id, email, mensaje, fecha_envio)
+                                VALUES (%s, %s, %s, %s, NOW())
+                            """, (
+                                tipo.lower(),
+                                vacunacion['id'],
+                                email,
+                                mensaje
+                            ))
+                            conn.commit()
+                            notificaciones_enviadas += 1
+                            print(f"Notificación registrada en la base de datos. Total enviadas: {notificaciones_enviadas}")
+                        except Exception as e:
+                            print(f"Error al registrar notificación: {e}")
+                
+                print(f"\n==== VERIFICACIÓN DE VACUNACIONES PENDIENTES FINALIZADA ====")
+                print(f"Total de notificaciones enviadas: {notificaciones_enviadas}")
+                
+                return notificaciones_enviadas
             
         except Exception as e:
             logger.error(f"Error al verificar vacunaciones pendientes: {e}")
             print(f"Error: {e}")
             return 0
+
+    def verificar_vitaminizaciones_pendientes(self):
+        """
+        Verifica si hay vitaminizaciones pendientes y envía notificaciones
+        
+        Returns:
+            int: Número de notificaciones enviadas
+        """
+        try:
+            print("\n==== INICIANDO VERIFICACIÓN DE VITAMINIZACIONES PENDIENTES ====\n")
+            
+            conn = self.db_connection()
+            if not conn:
+                logger.error("No se pudo conectar a la base de datos para verificar vitaminizaciones pendientes")
+                print("Error: No se pudo conectar a la base de datos")
+                return 0
+                
+            cursor = conn.cursor(dictionary=True)
+            
+            # Obtener configuraciones de alarmas de vitaminización activas
+            query_config = "SELECT * FROM config_alarmas WHERE tipo = 'vitaminizacion' AND activo = TRUE"
+            print(f"Ejecutando consulta: {query_config}")
+            
+            cursor.execute(query_config)
+            
+            configuraciones = cursor.fetchall()
+            print(f"Configuraciones de alarmas activas encontradas: {len(configuraciones)}")
+            
+            # Si no hay configuraciones, usar una configuración predeterminada con el correo configurado
+            if not configuraciones:
+                logger.info("No hay configuraciones de alarmas de vitaminización activas, usando configuración predeterminada")
+                print("No hay configuraciones de alarmas de vitaminización activas. Usando configuración predeterminada.")
+                
+                # Crear una configuración predeterminada
+                configuraciones = [{
+                    'usuario_id': 1,  # Usuario administrador por defecto
+                    'dias_anticipacion': 7,  # 7 días de anticipación
+                    'email': self.email_config['username']  # Usar el correo configurado
+                }]
+            
+            notificaciones_enviadas = 0
+            
+            # Para cada configuración, buscar vitaminizaciones pendientes
+            for config in configuraciones:
+                usuario_id = config['usuario_id']
+                dias_anticipacion = config['dias_anticipacion']
+                email = config['email']
+                
+                # Calcular la fecha límite
+                fecha_limite = datetime.now() + timedelta(days=dias_anticipacion)
+                
+                # Imprimir información de depuración
+                print(f"Buscando vitaminizaciones para usuario_id: {usuario_id}, con fecha límite: {fecha_limite.strftime('%Y-%m-%d')}")
+                
+                # Buscar todas las vitaminizaciones pendientes
+                query = """
+                    SELECT v.*, a.nombre as nombre_animal,
+                           a.numero_arete as arete_animal
+                    FROM vitaminizaciones v
+                    JOIN animales a ON v.animal_id = a.id
+                    WHERE v.fecha_proxima <= %s
+                    AND v.fecha_proxima >= CURDATE()
+                    AND v.usuario_id = %s
+                """
+                
+                print(f"Ejecutando consulta: {query}")
+                print(f"Con parámetros: {fecha_limite.strftime('%Y-%m-%d')}, {usuario_id}")
+                
+                cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'), usuario_id))
+                
+                vitaminizaciones = cursor.fetchall()
+                print(f"Vitaminizaciones pendientes encontradas: {len(vitaminizaciones)}")
+                
+                if vitaminizaciones:
+                    print("\n==== DETALLES DE VITAMINIZACIONES PENDIENTES ====")
+                    for v in vitaminizaciones:
+                        print(f"Animal: {v['nombre_animal']} (Arete: {v['arete_animal']})")
+                        print(f"  Producto: {v['producto']}")
+                        print(f"  Fecha próxima: {v['fecha_proxima']}")
+                        print("  ----------------------------------------")
+                
+                # Procesar cada vitaminización
+                for vitaminizacion in vitaminizaciones:
+                    producto = vitaminizacion['producto']
+                    nombre_animal = vitaminizacion['nombre_animal']
+                    arete_animal = vitaminizacion['arete_animal']
+                    
+                    # Crear mensaje
+                    asunto = f"Recordatorio de Vitaminización - {producto}"
+                    mensaje = f"""
+                    Recordatorio de vitaminización próxima:
+                    
+                    Producto: {producto}
+                    Fecha programada: {vitaminizacion['fecha_proxima']}
+                    
+                    Animal a vitaminizar:
+                    - {nombre_animal} (Arete: {arete_animal})
+                    
+                    Observaciones: {vitaminizacion['observaciones'] if vitaminizacion['observaciones'] else 'Ninguna'}
+                    """
+                    
+                    # Enviar la notificación
+                    print(f"Enviando notificación de vitaminización a {email}:")
+                    print(f"Asunto: {asunto}")
+                    print(f"Descripción: {mensaje}")
+                    
+                    enviado = self._enviar_notificacion_email(email, asunto, mensaje)
+                    
+                    if enviado:
+                        # Registrar la notificación en la base de datos
+                        try:
+                            cursor.execute("""
+                                INSERT INTO alarmas_enviadas
+                                (tipo, referencia_id, email, mensaje, fecha_envio)
+                                VALUES (%s, %s, %s, %s, NOW())
+                            """, (
+                                'vitaminizacion',
+                                vitaminizacion['id'],
+                                email,
+                                mensaje
+                            ))
+                            conn.commit()
+                            notificaciones_enviadas += 1
+                            print(f"Notificación registrada en la base de datos. Total enviadas: {notificaciones_enviadas}")
+                        except Exception as e:
+                            print(f"Error al registrar notificación: {e}")
+                
+                print(f"\n==== VERIFICACIÓN DE VITAMINIZACIONES PENDIENTES FINALIZADA ====")
+                print(f"Total de notificaciones enviadas: {notificaciones_enviadas}")
+                
+                return notificaciones_enviadas
+            
+        except Exception as e:
+            logger.error(f"Error al verificar vitaminizaciones pendientes: {e}")
+            print(f"Error: {e}")
+            return 0
+
     def _enviar_notificacion_email(self, destinatario, asunto, mensaje):
         """
         Envía una notificación por correo electrónico

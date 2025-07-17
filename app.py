@@ -27,38 +27,30 @@ import uuid
 import logging
 import shutil
 from logging.handlers import RotatingFileHandler
-from src.chatbot import GanaderiaChatbot
 from src.gestacion import registrar_gestacion, obtener_gestaciones, actualizar_estado_gestacion, obtener_gestaciones_proximas, eliminar_gestacion
 from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp
+from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
 
-# Asegurarse de que existe la carpeta static/comprobantes
-if not os.path.exists('static/comprobantes'):
-    os.makedirs('static/comprobantes', exist_ok=True)
-
-# Copiar todos los comprobantes existentes a la carpeta static
-if os.path.exists('uploads/comprobantes'):
-    for archivo in os.listdir('uploads/comprobantes'):
-        origen = os.path.join('uploads/comprobantes', archivo)
-        destino = os.path.join('static/comprobantes', archivo)
-        if os.path.isfile(origen) and not os.path.exists(destino):
-            shutil.copy2(origen, destino)
+# Asegurarse de que existen los directorios necesarios
+UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
+for folder in UPLOAD_FOLDERS:
+    os.makedirs(folder, exist_ok=True)
 
 # Inicializar el chatbot
 chatbot = None
 
+# Declarar db_connection como global
+global db_connection
+db_connection = None
+
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.config['SECRET_KEY'] = os.urandom(24)  # Clave secreta para sesiones
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 
 # Registrar el blueprint de registro_leche
 app.register_blueprint(registro_leche_bp, url_prefix='/registro_leche')
-
-# Ruta de redirección para /registro_leche
-@app.route('/registro_leche')
-def redirect_registro_leche():
-    return redirect('/registro_leche/')
 
 # Inicializar el sistema de auditoría
 auditoria = SistemaAuditoria(get_db_connection)
@@ -79,199 +71,95 @@ def verificar_alarmas_programadas():
         vitaminizaciones = alarmas.verificar_vitaminizaciones_pendientes()
         
         app.logger.info(f'Verificación programada de alarmas: {partos} notificaciones de partos, {vacunaciones} de vacunaciones y {vitaminizaciones} de vitaminizaciones enviadas')
-        
-        app.logger.info(f'Verificación programada de alarmas: {partos} notificaciones de partos y {vacunaciones} de vacunaciones enviadas')
     except Exception as e:
         app.logger.error(f'Error en la verificación programada de alarmas: {str(e)}')
 
 # Inicializar el planificador
 scheduler = BackgroundScheduler()
-# Ejecutar cada 6 horas en lugar de cada 24 horas para verificar más frecuentemente
 scheduler.add_job(func=verificar_alarmas_programadas, trigger="interval", hours=6)
-
-# Ejecutar la verificación de alarmas al iniciar la aplicación (después de 10 segundos)
 scheduler.add_job(func=verificar_alarmas_programadas, trigger="date", run_date=datetime.now() + timedelta(seconds=10))
-app.logger.info('Verificación inicial de alarmas programada')
-
-# Iniciar el planificador
 scheduler.start()
-
-# Asegurar que el planificador se detenga cuando la aplicación se cierre
 atexit.register(lambda: scheduler.shutdown())
 
-# Ruta para servir archivos estáticos de uploads
-@app.route('/uploads/<path:filename>')
-def uploaded_file(filename):
-    app.logger.info(f"Solicitando archivo: {filename}")
-    return send_from_directory(os.path.abspath('uploads'), filename)
-
-# Ruta específica para comprobantes
-@app.route('/ver_comprobante/<path:filepath>')
-def ver_comprobante(filepath):
-    app.logger.info(f"Solicitando comprobante: {filepath}")
-    
-    # Asegurarse de que la ruta no contenga intentos de acceder a directorios superiores
-    if '..' in filepath:
-        app.logger.error("Intento de acceso a directorios superiores detectado")
+# Función para servir archivos estáticos
+def serve_file(directory, filename, mimetype=None):
+    """Función centralizada para servir archivos estáticos de forma segura"""
+    if '..' in filename or filename.startswith('/'):
         return "Acceso denegado", 403
+        
+    filepath = os.path.join(directory, filename)
+    if not os.path.exists(filepath):
+        return f"Archivo no encontrado: {filename}", 404
+        
+    if mimetype is None:
+        # Determinar el tipo MIME basado en la extensión
+        extension = filename.split('.')[-1].lower() if '.' in filename else ''
+        mimetypes = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'pdf': 'application/pdf'
+        }
+        mimetype = mimetypes.get(extension)
     
-    # Limpiar la ruta para obtener solo el nombre del archivo
-    if '/' in filepath:
-        filename = filepath.split('/')[-1]
-    elif '\\' in filepath:
-        filename = filepath.split('\\')[-1]
+    return send_from_directory(directory, filename, mimetype=mimetype)
+
+# Ruta unificada para servir archivos
+@app.route('/files/<path:filename>')
+def serve_uploaded_file(filename):
+    """Ruta unificada para servir archivos desde diferentes directorios"""
+    # Determinar el directorio correcto basado en el prefijo del archivo
+    if filename.startswith('comprobantes/'):
+        return serve_file('static/comprobantes', filename.replace('comprobantes/', ''))
+    elif filename.startswith('animales/'):
+        return serve_file('static/uploads/animales', filename.replace('animales/', ''))
+    elif filename.startswith('perfiles/'):
+        return serve_file('static/uploads/perfiles', filename.replace('perfiles/', ''))
     else:
-        filename = filepath
-    
-    app.logger.info(f"Nombre de archivo extraído: {filename}")
-    
-    # Primero buscar en static/comprobantes
-    ruta_static = os.path.join(os.path.abspath('static/comprobantes'), filename)
-    if os.path.exists(ruta_static):
-        app.logger.info(f"Archivo encontrado en static/comprobantes: {ruta_static}")
-        # Obtener la extensión del archivo
-        extension = filename.split('.')[-1].lower() if '.' in filename else ''
-        # Establecer el tipo MIME adecuado según la extensión
-        mimetype = None
-        if extension in ['jpg', 'jpeg']:
-            mimetype = 'image/jpeg'
-        elif extension == 'png':
-            mimetype = 'image/png'
-        elif extension == 'gif':
-            mimetype = 'image/gif'
-        elif extension == 'pdf':
-            mimetype = 'application/pdf'
-        
-        return send_from_directory(os.path.abspath('static/comprobantes'), filename, mimetype=mimetype)
-    
-    # Si no está en static, buscar en uploads/comprobantes
-    ruta_uploads = os.path.join(os.path.abspath('uploads/comprobantes'), filename)
-    if os.path.exists(ruta_uploads):
-        app.logger.info(f"Archivo encontrado en uploads/comprobantes: {ruta_uploads}")
-        # Obtener la extensión del archivo
-        extension = filename.split('.')[-1].lower() if '.' in filename else ''
-        # Establecer el tipo MIME adecuado según la extensión
-        mimetype = None
-        if extension in ['jpg', 'jpeg']:
-            mimetype = 'image/jpeg'
-        elif extension == 'png':
-            mimetype = 'image/png'
-        elif extension == 'gif':
-            mimetype = 'image/gif'
-        elif extension == 'pdf':
-            mimetype = 'application/pdf'
-        
-        return send_from_directory(os.path.abspath('uploads/comprobantes'), filename, mimetype=mimetype)
-    
-    # Si no se encuentra en ninguna ubicación
-    app.logger.error(f"El archivo no existe: {filename}")
-    return f"Archivo no encontrado: {filename}", 404
-
-# Ruta alternativa para servir comprobantes directamente
-@app.route('/comprobantes/<path:filename>')
-def serve_comprobante(filename):
-    app.logger.info(f"Solicitando comprobante directo: {filename}")
-    return send_from_directory(os.path.abspath('uploads/comprobantes'), filename)
-
-# Ruta para servir comprobantes desde la carpeta static
-@app.route('/static_comprobante/<path:filename>')
-def static_comprobante(filename):
-    app.logger.info(f"Solicitando comprobante desde static: {filename}")
-    
-    # Obtener la extensión del archivo
-    extension = filename.split('.')[-1].lower() if '.' in filename else ''
-    
-    # Establecer el tipo MIME adecuado según la extensión
-    mimetype = None
-    if extension in ['jpg', 'jpeg']:
-        mimetype = 'image/jpeg'
-    elif extension == 'png':
-        mimetype = 'image/png'
-    elif extension == 'gif':
-        mimetype = 'image/gif'
-    elif extension == 'pdf':
-        mimetype = 'application/pdf'
-    
-    return send_from_directory(os.path.abspath('static/comprobantes'), filename, mimetype=mimetype)
-
-# Configuración del sistema de registro
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-
-file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240, backupCount=10)
-file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-))
-file_handler.setLevel(logging.INFO)
-app.logger.addHandler(file_handler)
-app.logger.setLevel(logging.INFO)
-app.logger.info('Iniciando Sistema Ganadero')
-
-# Inicializar conexión de base de datos
-try:
-    db_connection = DatabaseConnection(app)
-    # Inicializar el sistema de auditoría
-    auditoria = SistemaAuditoria(get_db_connection)
-    app.logger.info('Sistema de auditoría inicializado correctamente')
-except Exception as e:
-    app.logger.error(f"Error fatal al inicializar la base de datos: {e}")
-
-# Inicializar chatbot
-try:
-    chatbot = GanaderiaChatbot(db_connection)
-except NameError:
-    app.logger.warning("db_connection no está definido, utilizando get_db_connection() como alternativa")
-    chatbot = None  # Inicializamos como None y lo configuraremos más adelante
-
-# Configuración de carga de archivos
-UPLOAD_FOLDER = 'static/uploads/animales'
-UPLOAD_FOLDER_PERFIL = 'static/uploads/perfiles'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# Ya tenemos la configuración de carga de imagen de perfil definida arriba
-
-def allowed_file_perfil(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            flash('Por favor inicia sesión para acceder a esta página', 'error')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+        return "Tipo de archivo no válido", 400
 
 @app.route('/')
 def inicio():
     app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
     return render_template('inicio.html')
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
-    return render_template('login.html')
-
-@app.route('/autenticar', methods=['POST'])
-def autenticar():
-    app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
-    username = request.form['username']
-    password = request.form['password']
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        global db_connection
+        # Si db_connection no está inicializado, intentar inicializarlo
+        if db_connection is None:
+            try:
+                db_connection = DatabaseConnection(app)
+                app.logger.info("Conexión a la base de datos inicializada correctamente")
+            except Exception as e:
+                app.logger.error(f"Error al inicializar la conexión de base de datos: {e}")
+                flash('Error de conexión con la base de datos. Por favor, inténtelo de nuevo más tarde.', 'error')
+                return render_template('login.html')
+        
+        try:
+            # Intentar validar el usuario
+            user = db_connection.validate_user(username, password)
+            if user:
+                session['username'] = username
+                session['usuario_id'] = user['id']
+                app.logger.info(f"Usuario {username} ha iniciado sesión correctamente")
+                return redirect(url_for('dashboard'))
+            else:
+                app.logger.warning(f"Intento de inicio de sesión fallido para el usuario: {username}")
+                flash('Usuario o contraseña incorrectos', 'error')
+                return render_template('login.html')
+        except Exception as e:
+            app.logger.error(f"Error durante la autenticación: {e}")
+            flash('Error durante la autenticación. Por favor, inténtelo de nuevo.', 'error')
+            return render_template('login.html')
     
-    user = db_connection.validate_user(username, password)
-    if user:
-        # Redirigir a la página principal del sistema
-        session['username'] = username
-        session['usuario_id'] = user['id']  # Guardar el ID de usuario en la sesión
-        return redirect(url_for('dashboard'))
-    else:
-        flash('Credenciales incorrectas', 'error')
-        return redirect(url_for('login'))
+    return render_template('login.html')
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
@@ -307,6 +195,16 @@ def registro():
     
     return render_template('registro.html')
 
+# Definir el decorador login_required
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            flash('Por favor inicie sesión para acceder a esta página', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -321,7 +219,7 @@ def dashboard():
         cursor.execute("SELECT COUNT(*) as total FROM gestaciones WHERE estado = 'En Gestación'")
         total_gestaciones = cursor.fetchone()['total']
         
-        cursor.execute("SELECT SUM(cantidad) as total FROM registro_leche")
+        cursor.execute("SELECT SUM(total_dia) as total FROM registro_leche")
         total_leche = cursor.fetchone()['total'] or 0
         
         # Contar vacunaciones pendientes de todas las tablas
@@ -329,23 +227,23 @@ def dashboard():
         cursor.execute("""
             SELECT COUNT(DISTINCT c.id) as total 
             FROM carbunco c 
-            WHERE c.proxima_aplicacion BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            WHERE c.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         """)
         total_carbunco = cursor.fetchone()['total']
         
         # 2. Vitaminización
         cursor.execute("""
             SELECT COUNT(DISTINCT v.id) as total 
-            FROM vitaminizacion v 
-            WHERE v.proxima_aplicacion BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            FROM vitaminizaciones v 
+            WHERE v.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         """)
         total_vitaminizacion = cursor.fetchone()['total']
         
         # 3. Desparasitación
         cursor.execute("""
             SELECT COUNT(DISTINCT d.id) as total 
-            FROM desparasitacion d 
-            WHERE d.proxima_aplicacion BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            FROM desparasitaciones d 
+            WHERE d.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         """)
         total_desparasitacion = cursor.fetchone()['total']
         
@@ -372,9 +270,9 @@ def dashboard():
             SELECT g.*, a.nombre as nombre_animal, a.numero_arete
             FROM gestaciones g
             JOIN animales a ON g.animal_id = a.id
-            WHERE DATE_ADD(g.fecha_inseminacion, INTERVAL 283 DAY) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            WHERE g.fecha_probable_parto BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
             AND g.estado = 'En Gestación'
-            ORDER BY g.fecha_inseminacion ASC
+            ORDER BY g.fecha_probable_parto ASC
             LIMIT 5
         """)
         proximos_partos = cursor.fetchall()
@@ -385,17 +283,15 @@ def dashboard():
             SELECT 
                 c.id, 
                 c.fecha_registro, 
-                c.proxima_aplicacion as fecha_programada, 
+                c.fecha_proxima as fecha_programada, 
                 'Carbunco' as tipo_vacuna,
-                c.producto,
+                c.dosis as producto,
                 a.nombre as nombre_animal, 
                 a.numero_arete,
                 a.id as animal_id
             FROM carbunco c
-            JOIN carbunco_animal ca ON c.id = ca.carbunco_id
-            JOIN animales a ON ca.animal_id = a.id
-            WHERE c.proxima_aplicacion BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-            GROUP BY c.id, a.id
+            JOIN animales a ON c.animal_id = a.id
+            WHERE c.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         """)
         proximas_carbunco = cursor.fetchall()
         
@@ -403,18 +299,16 @@ def dashboard():
         cursor.execute("""
             SELECT 
                 v.id, 
-                v.fecha_registro, 
-                v.proxima_aplicacion as fecha_programada, 
+                v.fecha_aplicacion, 
+                v.fecha_proxima as fecha_programada, 
                 'Vitaminización' as tipo_vacuna,
                 v.producto,
                 a.nombre as nombre_animal, 
                 a.numero_arete,
                 a.id as animal_id
-            FROM vitaminizacion v
-            JOIN vitaminizacion_animal va ON v.id = va.vitaminizacion_id
-            JOIN animales a ON va.animal_id = a.id
-            WHERE v.proxima_aplicacion BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-            GROUP BY v.id, a.id
+            FROM vitaminizaciones v
+            JOIN animales a ON v.animal_id = a.id
+            WHERE v.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         """)
         proximas_vitaminizacion = cursor.fetchall()
         
@@ -423,17 +317,15 @@ def dashboard():
             SELECT 
                 d.id, 
                 d.fecha_registro, 
-                d.proxima_aplicacion as fecha_programada, 
+                d.fecha_proxima as fecha_programada, 
                 'Desparasitación' as tipo_vacuna,
                 d.producto,
                 a.nombre as nombre_animal, 
                 a.numero_arete,
                 a.id as animal_id
-            FROM desparasitacion d
-            JOIN desparasitacion_animal da ON d.id = da.desparasitacion_id
-            JOIN animales a ON da.animal_id = a.id
-            WHERE d.proxima_aplicacion BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-            GROUP BY d.id, a.id
+            FROM desparasitaciones d
+            JOIN animales a ON d.animal_id = a.id
+            WHERE d.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         """)
         proximas_desparasitacion = cursor.fetchall()
         
@@ -520,21 +412,29 @@ def configurar_alarma():
         flash(f'Error al configurar la alarma: {str(e)}', 'error')
         return redirect(url_for('configuracion_alarmas'))
 
-@app.route('/verificar-alarmas-manual')
+@app.route('/verificar-alarmas')
 @login_required
-def verificar_alarmas_manual():
+def verificar_alarmas():
     try:
-        # Verificar partos próximos y vacunaciones pendientes
-        notificaciones_partos = alarmas.verificar_partos_proximos()
-        notificaciones_vacunaciones = alarmas.verificar_vacunaciones_pendientes()
+        # Verificar partos próximos
+        partos = alarmas.verificar_partos_proximos()
         
-        total_notificaciones = notificaciones_partos + notificaciones_vacunaciones
+        # Verificar vacunaciones pendientes
+        vacunaciones = alarmas.verificar_vacunaciones_pendientes()
         
-        if total_notificaciones > 0:
-            flash(f'Se enviaron {total_notificaciones} notificaciones', 'success')
+        # Verificar desparasitaciones pendientes
+        desparasitaciones = alarmas.verificar_desparasitaciones_pendientes()
+        
+        # Verificar vitaminizaciones pendientes
+        vitaminizaciones = alarmas.verificar_vitaminizaciones_pendientes()
+        
+        total = partos + vacunaciones + desparasitaciones + vitaminizaciones
+        
+        if total > 0:
+            flash(f'Se enviaron {total} notificaciones ({partos} de partos, {vacunaciones} de vacunaciones, {desparasitaciones} de desparasitaciones y {vitaminizaciones} de vitaminizaciones)', 'success')
         else:
             flash('No hay notificaciones pendientes para enviar', 'info')
-            
+        
         return redirect(url_for('configuracion_alarmas'))
     except Exception as e:
         flash(f'Error al verificar alarmas: {str(e)}', 'error')
@@ -622,28 +522,6 @@ def configurar_email_alarmas():
         flash(f'Error al configurar el correo electrónico: {str(e)}', 'error')
         return redirect(url_for('configuracion_alarmas'))
 
-@app.route('/verificar-alarmas')
-@login_required
-def verificar_alarmas():
-    try:
-        # Verificar partos próximos
-        partos = alarmas.verificar_partos_proximos()
-        
-        # Verificar vacunaciones pendientes
-        vacunaciones = alarmas.verificar_vacunaciones_pendientes()
-        
-        total = partos + vacunaciones
-        
-        if total > 0:
-            flash(f'Se enviaron {total} notificaciones ({partos} de partos y {vacunaciones} de vacunaciones)', 'success')
-        else:
-            flash('No hay notificaciones pendientes para enviar', 'info')
-        
-        return redirect(url_for('configuracion_alarmas'))
-    except Exception as e:
-        flash(f'Error al verificar alarmas: {str(e)}', 'error')
-        return redirect(url_for('configuracion_alarmas'))
-
 @app.route('/historial-auditoria')
 @login_required
 def historial_auditoria():
@@ -679,197 +557,115 @@ def recuperar_contrasena():
     return render_template('recuperar_contrasena.html')
 
 @app.route('/animales')
+@login_required
 def animales():
-    app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
-    # Verificar si el usuario está logueado
-    if 'username' not in session:
-        flash('Debes iniciar sesión primero', 'error')
-        return redirect(url_for('login'))
-    
-    # Obtener el ID del usuario de la sesión
-    usuario_id = session.get('usuario_id')
-    
-    if not usuario_id:
-        flash('No se pudo identificar al usuario', 'error')
-        return redirect(url_for('login'))
-    
-    # Obtener la lista de animales del usuario
-    animales = db_connection.obtener_animales(usuario_id)
-    
-    # Pasar la fecha actual al contexto para calcular edades
-    now = datetime.now().date()
-    
-    return render_template('animales.html', animales=animales, now=now)
+    return render_template('animales.html')
 
 @app.route('/registrar-animal', methods=['GET', 'POST'])
+@login_required
 def registrar_animal():
-    app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
-    # Verificar si el usuario está logueado
-    if 'username' not in session:
-        flash('Debes iniciar sesión primero', 'error')
-        return redirect(url_for('login'))
-    
-    if request.method == 'POST':
-        # Obtener datos del formulario
-        datos_animal = {
-            'numero_arete': request.form['numero_arete'],
-            'nombre': request.form['nombre'],
-            'sexo': request.form['sexo'],
-            'raza': request.form['raza'],
-            'condicion': request.form['condicion'],
-            'fecha_nacimiento': request.form['fecha_nacimiento'],
-            'propietario': request.form['propietario'],
-            'padre_arete': request.form.get('padre_arete', None),
-            'madre_arete': request.form.get('madre_arete', None),
-            'usuario_id': session.get('usuario_id')
-        }
-        
-        # Manejar la carga de la foto
-        foto = request.files['foto']
-        if foto and allowed_file(foto.filename):
-            # Generar un nombre de archivo único
-            filename = str(uuid.uuid4()) + '.' + foto.filename.rsplit('.', 1)[1].lower()
-            
-            # Asegurar que el directorio exista
-            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-            
-            # Ruta completa del archivo
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-            
-            # Guardar el archivo
-            foto.save(filepath)
-            
-            # Ruta para la base de datos
-            datos_animal['foto_path'] = f'static/uploads/animales/{filename}'
-        else:
-            # Si no se sube imagen, usar imagen de marcador de posición
-            datos_animal['foto_path'] = 'static/images/upload-image-placeholder.svg'
-            app.logger.error("No se subió imagen, usando marcador de posición")
-        
-        # Registrar el animal
-        resultado = db_connection.registrar_animal(datos_animal)
-        
-        if resultado:
-            # Registrar la actividad en el sistema de auditoría
-            auditoria.registrar_actividad(
-                accion='Registrar', 
-                modulo='Animales', 
-                descripcion=f'Se registró un nuevo animal: {datos_animal["nombre"]} (Arete: {datos_animal["numero_arete"]})'
-            )
-            flash('Animal registrado exitosamente', 'success')
-            return redirect(url_for('animales'))
-        else:
-            flash('Error al registrar el animal', 'error')
-    
     return render_template('registrar_animal.html')
 
 @app.route('/editar-animal/<int:animal_id>', methods=['GET', 'POST'])
 def editar_animal(animal_id):
-    app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
     # Verificar si el usuario está logueado
     if 'username' not in session:
         flash('Debes iniciar sesión primero', 'error')
         return redirect(url_for('login'))
     
-    # Obtener el animal a editar sin verificar el usuario_id
+    # Obtener información del animal
+    animal = db_connection.obtener_animal_por_id(animal_id)
+    
+    if not animal:
+        flash('Animal no encontrado', 'error')
+        return redirect(url_for('animales'))
+    
+    # Si no hay foto o es la imagen por defecto, usar imagen por defecto
+    if not animal['foto_path'] or animal['foto_path'] == 'static/images/upload-image-placeholder.svg':
+        animal['foto_path'] = 'static/images/upload-image-placeholder.svg'
+    
+    if request.method == 'POST':
+        # Procesar el formulario de edición
+        datos_animal = {
+            'nombre': request.form.get('nombre'),
+            'numero_arete': request.form.get('numero_arete'),
+            'raza': request.form.get('raza'),
+            'sexo': request.form.get('sexo'),
+            'condicion': request.form.get('condicion'),
+            'foto_path': animal['foto_path'],
+            'fecha_nacimiento': request.form.get('fecha_nacimiento'),
+            'propietario': request.form.get('propietario'),
+            'padre_arete': request.form.get('padre_arete'),
+            'madre_arete': request.form.get('madre_arete')
+        }
+        
+        # Actualizar foto si se proporciona
+        foto = request.files.get('foto')
+        if foto and allowed_file(foto.filename):
+            # Si hay una foto anterior en Cloudinary, eliminarla
+            if animal['foto_path'] and 'cloudinary' in animal['foto_path']:
+                public_id = get_public_id_from_url(animal['foto_path'])
+                if public_id:
+                    delete_file(public_id)
+            
+            # Subir la nueva imagen a Cloudinary
+            cloudinary_url = upload_file(foto, folder="animales")
+            if cloudinary_url:
+                datos_animal['foto_path'] = cloudinary_url
+            else:
+                flash('Error al subir la imagen', 'error')
+                return render_template('editar_animal.html', animal=animal)
+        
+        # Actualizar el animal en la base de datos
+        resultado = db_connection.actualizar_animal(animal_id, datos_animal)
+        
+        if resultado:
+            flash('Animal actualizado exitosamente', 'success')
+            return redirect(url_for('animales'))
+        else:
+            flash('Error al actualizar el animal', 'error')
+    
+    return render_template('editar_animal.html', animal=animal)
+
+@app.route('/eliminar-animal/<int:animal_id>', methods=['GET'])
+def eliminar_animal(animal_id):
+    # Verificar si el usuario está logueado
+    if 'username' not in session:
+        flash('Debes iniciar sesión primero', 'error')
+        return redirect(url_for('login'))
+    
     try:
-        # No pasamos el usuario_id para permitir editar cualquier animal
+        # Obtener información del animal antes de eliminarlo
         animal = db_connection.obtener_animal_por_id(animal_id)
         
         if not animal:
             flash('Animal no encontrado', 'error')
             return redirect(url_for('animales'))
         
-        # Normalizar la ruta de la imagen
-        if animal['foto_path']:
-            # Si la ruta no comienza con 'static/', agregarla
-            if not animal['foto_path'].startswith('static/'):
-                animal['foto_path'] = f'static/{animal["foto_path"]}'
-        else:
-            # Usar imagen de marcador de posición
-            animal['foto_path'] = 'static/images/upload-image-placeholder.svg'
-        
-        if request.method == 'POST':
-            # Procesar el formulario de edición
-            datos_animal = {
-                'nombre': request.form.get('nombre'),
-                'numero_arete': request.form.get('numero_arete'),
-                'raza': request.form.get('raza'),
-                'sexo': request.form.get('sexo'),
-                'condicion': request.form.get('condicion'),
-                'foto_path': animal['foto_path'],
-                'fecha_nacimiento': request.form.get('fecha_nacimiento'),
-                'propietario': request.form.get('propietario'),
-                'padre_arete': request.form.get('padre_arete'),
-                'madre_arete': request.form.get('madre_arete')
-            }
-            
-            # Actualizar foto si se proporciona
-            foto = request.files.get('foto')
-            if foto and allowed_file(foto.filename):
-                filename = secure_filename(foto.filename)
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                foto.save(filepath)
-                datos_animal['foto_path'] = f'static/uploads/animales/{filename}'
-            
-            # Llamar al método de actualización en la base de datos
-            try:
-                db_connection.actualizar_animal(animal_id, datos_animal)
-                # Registrar la actividad en el sistema de auditoría
-                auditoria.registrar_actividad(
-                    accion='Actualizar', 
-                    modulo='Animales', 
-                    descripcion=f'Se actualizó la información del animal ID: {animal_id}'
-                )
-                return jsonify({
-                    'success': True,
-                    'message': 'Animal actualizado exitosamente'
-                })
-            except Exception as e:
-                app.logger.error(f'Error al actualizar el animal: {str(e)}')
-                return jsonify({
-                    'success': False,
-                    'message': f'Error al actualizar el animal: {str(e)}'
-                })
-        
-        return render_template('editar_animal.html', animal=animal)
-    
-    except Exception as e:
-        app.logger.error(f'Error al editar el animal: {str(e)}')
-        flash(f'Error al editar el animal: {str(e)}', 'error')
-        return redirect(url_for('animales'))
-
-@app.route('/eliminar-animal/<int:animal_id>', methods=['GET'])
-def eliminar_animal(animal_id):
-    app.logger.debug(f'Ruta solicitada: {request.path}, Método: {request.method}')
-    # Verificar si el usuario está logueado
-    if 'username' not in session:
-        flash('Debes iniciar sesión primero', 'error')
-        return redirect(url_for('login'))
-    
-    try:
-        # Obtener el ID de usuario de la sesión
-        usuario_id = session.get('usuario_id')
+        # Si el animal tiene una imagen en Cloudinary, eliminarla
+        if animal['foto_path'] and 'cloudinary' in animal['foto_path']:
+            public_id = get_public_id_from_url(animal['foto_path'])
+            if public_id:
+                delete_file(public_id)
         
         # Eliminar el animal de la base de datos
-        resultado = db_connection.eliminar_animal(animal_id, usuario_id)
+        resultado = db_connection.eliminar_animal(animal_id)
         
-        # Registrar la actividad en el sistema de auditoría
-        auditoria.registrar_actividad(
-            accion='Eliminar', 
-            modulo='Animales', 
-            descripcion=f'Se eliminó el animal con ID: {animal_id}'
-        )
-        
-        flash('Animal eliminado exitosamente', 'success')
-        return redirect(url_for('animales'))
-    
+        if resultado:
+            # Registrar la actividad en el sistema de auditoría
+            auditoria.registrar_actividad(
+                accion='Eliminar', 
+                modulo='Animales', 
+                descripcion=f'Se eliminó el animal ID: {animal_id}'
+            )
+            flash('Animal eliminado exitosamente', 'success')
+        else:
+            flash('Error al eliminar el animal', 'error')
+            
     except Exception as e:
-        app.logger.error(f'Error al eliminar el animal: {str(e)}')
         flash(f'Error al eliminar el animal: {str(e)}', 'error')
-        return redirect(url_for('animales'))
-
-# La ruta de configuración ha sido eliminada ya que no es necesaria para el funcionamiento del sistema
+    
+    return redirect(url_for('animales'))
 
 @app.route('/perfil/editar', methods=['GET', 'POST'])
 def editar_perfil():
@@ -1258,24 +1054,27 @@ def desparasitacion():
         # Obtener todos los animales
         cursor.execute("""
             SELECT a.*, 
-                   (SELECT MAX(d.fecha_registro) 
-                    FROM desparasitacion d 
-                    JOIN desparasitacion_animal da ON d.id = da.desparasitacion_id 
-                    WHERE da.animal_id = a.id) as ultima_desparasitacion
+                   (SELECT MAX(d.fecha_aplicacion) 
+                    FROM desparasitaciones d 
+                    WHERE d.animal_id = a.id AND d.usuario_id = %s) as ultima_desparasitacion
             FROM animales a
+            WHERE a.usuario_id = %s
             ORDER BY a.id DESC
-        """)
+        """, (session['usuario_id'], session['usuario_id']))
         animales = cursor.fetchall()
         
         # Obtener registros de desparasitación
         cursor.execute("""
             SELECT d.*, 
-                   (SELECT COUNT(*) 
-                    FROM desparasitacion_animal da 
-                    WHERE da.desparasitacion_id = d.id) as cantidad_animales
-            FROM desparasitacion d
-            ORDER BY d.fecha_registro DESC
-        """)
+                   a.nombre as nombre_animal,
+                   a.numero_arete as arete_animal,
+                   DATE_FORMAT(d.fecha_aplicacion, '%d/%m/%Y') as fecha_aplicacion_formato,
+                   DATE_FORMAT(d.fecha_proxima, '%d/%m/%Y') as fecha_proxima_formato
+            FROM desparasitaciones d
+            JOIN animales a ON d.animal_id = a.id
+            WHERE d.usuario_id = %s
+            ORDER BY d.fecha_aplicacion DESC
+        """, (session['usuario_id'],))
         registros = cursor.fetchall()
         
         cursor.close()
@@ -1308,30 +1107,16 @@ def registrar_desparasitacion():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Insertar registro de desparasitación
-        cursor.execute("""
-            INSERT INTO desparasitacion 
-            (fecha_registro, producto, aplicacion_general, vacunador, proxima_aplicacion)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (fecha_registro, producto, tipo_aplicacion == 'general', vacunador, proxima_aplicacion.strftime('%Y-%m-%d')))
+        # Obtener animales seleccionados
+        animales_seleccionados = request.form.getlist('animales_seleccionados[]')
         
-        desparasitacion_id = cursor.lastrowid
-        
-        # Relacionar con animales
-        if tipo_aplicacion == 'general':
-            # Aplicar a todos los animales
+        # Insertar registro para cada animal seleccionado
+        for animal_id in animales_seleccionados:
             cursor.execute("""
-                INSERT INTO desparasitacion_animal (desparasitacion_id, animal_id)
-                SELECT %s, id FROM animales
-            """, (desparasitacion_id,))
-        else:
-            # Aplicar solo a los animales seleccionados
-            animales_seleccionados = request.form.getlist('animales_seleccionados[]')
-            for animal_id in animales_seleccionados:
-                cursor.execute("""
-                    INSERT INTO desparasitacion_animal (desparasitacion_id, animal_id)
-                    VALUES (%s, %s)
-                """, (desparasitacion_id, animal_id))
+                INSERT INTO desparasitaciones 
+                (animal_id, fecha_aplicacion, producto, dosis, fecha_proxima, observaciones, usuario_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (animal_id, fecha_registro, producto, tipo_aplicacion, proxima_aplicacion.strftime('%Y-%m-%d'), vacunador, session['usuario_id']))
         
         conn.commit()
         cursor.close()
@@ -1354,28 +1139,22 @@ def detalles_desparasitacion(id):
         # Obtener detalles del registro
         cursor.execute("""
             SELECT d.*, 
-                   DATE_FORMAT(d.fecha_registro, '%d/%m/%Y') as fecha_registro_formato,
-                   DATE_FORMAT(d.proxima_aplicacion, '%d/%m/%Y') as proxima_aplicacion_formato
-            FROM desparasitacion d
-            WHERE d.id = %s
-        """, (id,))
+                   a.nombre as nombre_animal,
+                   a.numero_arete as arete_animal,
+                   DATE_FORMAT(d.fecha_aplicacion, '%d/%m/%Y') as fecha_aplicacion_formato,
+                   DATE_FORMAT(d.fecha_proxima, '%d/%m/%Y') as proxima_aplicacion_formato
+            FROM desparasitaciones d
+            JOIN animales a ON d.animal_id = a.id
+            WHERE d.id = %s AND d.usuario_id = %s
+        """, (id, session['usuario_id']))
         registro = cursor.fetchone()
         
         if not registro:
             return jsonify({'error': 'Registro no encontrado'}), 404
             
         # Formatear fechas
-        registro['fecha_registro'] = registro['fecha_registro_formato']
+        registro['fecha_aplicacion'] = registro['fecha_aplicacion_formato']
         registro['proxima_aplicacion'] = registro['proxima_aplicacion_formato']
-        
-        # Obtener animales relacionados
-        cursor.execute("""
-            SELECT a.* 
-            FROM animales a
-            JOIN desparasitacion_animal da ON a.id = da.animal_id
-            WHERE da.desparasitacion_id = %s
-        """, (id,))
-        registro['animales'] = cursor.fetchall()
         
         cursor.close()
         conn.close()
@@ -1392,11 +1171,8 @@ def eliminar_desparasitacion(id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Primero eliminar registros relacionados en desparasitacion_animal
-        cursor.execute("DELETE FROM desparasitacion_animal WHERE desparasitacion_id = %s", (id,))
-        
-        # Luego eliminar el registro principal
-        cursor.execute("DELETE FROM desparasitacion WHERE id = %s", (id,))
+        # Eliminar el registro de desparasitación
+        cursor.execute("DELETE FROM desparasitaciones WHERE id = %s AND usuario_id = %s", (id, session['usuario_id']))
         
         conn.commit()
         cursor.close()
@@ -1641,9 +1417,9 @@ def pastizales():
         # Obtener todos los pastizales del usuario
         cursor.execute("""
             SELECT p.*, 
-                   COUNT(DISTINCT pa.animal_id) as animales_actuales
+                   COUNT(DISTINCT ap.animal_id) as animales_actuales
             FROM pastizales p
-            LEFT JOIN pastizales_animales pa ON p.id = pa.pastizal_id
+            LEFT JOIN animales_pastizal ap ON p.id = ap.pastizal_id AND ap.fecha_retiro IS NULL
             WHERE p.usuario_id = %s
             GROUP BY p.id
         """, (session['usuario_id'],))
@@ -1672,9 +1448,9 @@ def registrar_pastizal():
         
         cursor.execute("""
             INSERT INTO pastizales (
-                nombre, dimension, tipo_hierba, estado, usuario_id
-            ) VALUES (%s, %s, %s, 'Disponible', %s)
-        """, (nombre, dimension, tipo_hierba, session['usuario_id']))
+                nombre, area, estado, descripcion, usuario_id
+            ) VALUES (%s, %s, 'Activo', %s, %s)
+        """, (nombre, dimension, f"Tipo de hierba: {tipo_hierba}", session['usuario_id']))
         
         conn.commit()
         flash('Pastizal registrado exitosamente', 'success')
@@ -1698,9 +1474,9 @@ def obtener_animales_disponibles(pastizal_id):
         # Obtener información del pastizal
         cursor.execute("""
             SELECT p.*,
-                   COUNT(DISTINCT pa.animal_id) as animales_actuales
+                   COUNT(DISTINCT ap.animal_id) as animales_actuales
             FROM pastizales p
-            LEFT JOIN pastizales_animales pa ON p.id = pa.pastizal_id
+            LEFT JOIN animales_pastizal ap ON p.id = ap.pastizal_id AND ap.fecha_retiro IS NULL
             WHERE p.id = %s AND p.usuario_id = %s
             GROUP BY p.id
         """, (pastizal_id, session['usuario_id']))
@@ -1715,20 +1491,22 @@ def obtener_animales_disponibles(pastizal_id):
             SELECT 
                 a.id,
                 a.nombre,
-                a.categoria,
+                a.condicion as categoria,
                 a.estado
             FROM animales a
-            LEFT JOIN pastizales_animales pa ON a.id = pa.animal_id
-            WHERE pa.id IS NULL
+            LEFT JOIN animales_pastizal ap ON a.id = ap.animal_id AND ap.fecha_retiro IS NULL
+            WHERE ap.id IS NULL
                 AND a.usuario_id = %s
-                AND a.estado = 'Activo'
             ORDER BY a.nombre
         """, (session['usuario_id'],))
         
         animales = cursor.fetchall()
         
+        # Calcular capacidad máxima basada en el área (3.5m² por animal)
+        capacidad_maxima = int(pastizal['area'] / 3.5) if pastizal['area'] else 0
+        
         return jsonify({
-            'capacidad_maxima': pastizal['capacidad_maxima'],
+            'capacidad_maxima': capacidad_maxima,
             'animales_actuales': pastizal['animales_actuales'] or 0,
             'animales': animales
         })
@@ -1753,12 +1531,12 @@ def asignar_animales(pastizal_id):
         # Verificar capacidad y animales actuales
         cursor.execute("""
             SELECT 
-                p.capacidad_maxima,
-                COUNT(DISTINCT pa.animal_id) as animales_actuales
+                p.area,
+                COUNT(DISTINCT ap.animal_id) as animales_actuales
             FROM pastizales p
-            LEFT JOIN pastizales_animales pa ON p.id = pa.pastizal_id
+            LEFT JOIN animales_pastizal ap ON p.id = ap.pastizal_id AND ap.fecha_retiro IS NULL
             WHERE p.id = %s AND p.usuario_id = %s
-            GROUP BY p.id, p.capacidad_maxima
+            GROUP BY p.id, p.area
         """, (pastizal_id, session['usuario_id']))
         
         pastizal = cursor.fetchone()
@@ -1767,8 +1545,9 @@ def asignar_animales(pastizal_id):
             flash('Pastizal no encontrado', 'danger')
             return redirect(url_for('pastizales'))
         
-        capacidad_maxima = pastizal[0]
+        area_pastizal = pastizal[0]
         animales_actuales = pastizal[1] or 0
+        capacidad_maxima = int(area_pastizal / 3.5) if area_pastizal else 0
         
         if len(animales) + animales_actuales > capacidad_maxima:
             flash(f'No se pueden asignar más de {capacidad_maxima} animales a este pastizal', 'danger')
@@ -1777,16 +1556,15 @@ def asignar_animales(pastizal_id):
         # Actualizar estado del pastizal
         cursor.execute("""
             UPDATE pastizales 
-            SET estado = 'En uso',
-                fecha_ultimo_uso = %s
+            SET estado = 'En uso'
             WHERE id = %s AND usuario_id = %s
-        """, (fecha_actual, pastizal_id, session['usuario_id']))
+        """, (pastizal_id, session['usuario_id']))
         
         # Registrar animales en el pastizal
         for animal_id in animales:
             cursor.execute("""
-                INSERT INTO pastizales_animales (
-                    pastizal_id, animal_id, fecha_ingreso
+                INSERT INTO animales_pastizal (
+                    pastizal_id, animal_id, fecha_asignacion
                 ) VALUES (%s, %s, %s)
             """, (pastizal_id, animal_id, fecha_actual))
             
@@ -2025,12 +1803,9 @@ def genealogia():
         cursor.execute("""
             SELECT g.*, 
                    a.nombre as nombre_animal,
-                   p.nombre as padre_nombre,
-                   m.nombre as madre_nombre
+                   a.numero_arete as animal_arete
             FROM genealogia g
             JOIN animales a ON g.animal_id = a.id
-            LEFT JOIN animales p ON g.padre_id = p.id
-            LEFT JOIN animales m ON g.madre_id = m.id
             ORDER BY a.nombre
         """)
         genealogia = cursor.fetchall()
@@ -2055,17 +1830,24 @@ def genealogia():
 def agregar_genealogia():
     try:
         animal_id = request.form['animal_id']
-        padre_id = request.form['padre_id'] or None
-        madre_id = request.form['madre_id'] or None
-        caracteristicas = request.form.get('caracteristicas_heredadas', '')
+        padre_arete = request.form.get('padre_arete', '')
+        madre_arete = request.form.get('madre_arete', '')
+        abuelo_paterno_arete = request.form.get('abuelo_paterno_arete', '')
+        abuela_paterna_arete = request.form.get('abuela_paterna_arete', '')
+        abuelo_materno_arete = request.form.get('abuelo_materno_arete', '')
+        abuela_materna_arete = request.form.get('abuela_materna_arete', '')
+        observaciones = request.form.get('observaciones', '')
         
         db = get_db_connection()
         cursor = db.cursor()
         
         cursor.execute("""
-            INSERT INTO genealogia (animal_id, padre_id, madre_id, caracteristicas_heredadas)
-            VALUES (%s, %s, %s, %s)
-        """, (animal_id, padre_id, madre_id, caracteristicas))
+            INSERT INTO genealogia (animal_id, padre_arete, madre_arete, 
+                                  abuelo_paterno_arete, abuela_paterna_arete,
+                                  abuelo_materno_arete, abuela_materna_arete, observaciones)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (animal_id, padre_arete, madre_arete, abuelo_paterno_arete, 
+              abuela_paterna_arete, abuelo_materno_arete, abuela_materna_arete, observaciones))
         
         db.commit()
         flash('Registro genealógico agregado exitosamente', 'success')
@@ -2089,12 +1871,9 @@ def obtener_genealogia(id):
         cursor.execute("""
             SELECT g.*, 
                    a.nombre as nombre_animal,
-                   p.nombre as padre_nombre,
-                   m.nombre as madre_nombre
+                   a.numero_arete as animal_arete
             FROM genealogia g
             JOIN animales a ON g.animal_id = a.id
-            LEFT JOIN animales p ON g.padre_id = p.id
-            LEFT JOIN animales m ON g.madre_id = m.id
             WHERE g.id = %s
         """, (id,))
         genealogia = cursor.fetchone()
@@ -2116,9 +1895,13 @@ def obtener_genealogia(id):
 def editar_genealogia(id):
     try:
         animal_id = request.form['animal_id']
-        padre_id = request.form['padre_id'] or None
-        madre_id = request.form['madre_id'] or None
-        caracteristicas = request.form.get('caracteristicas_heredadas', '')
+        padre_arete = request.form.get('padre_arete', '')
+        madre_arete = request.form.get('madre_arete', '')
+        abuelo_paterno_arete = request.form.get('abuelo_paterno_arete', '')
+        abuela_paterna_arete = request.form.get('abuela_paterna_arete', '')
+        abuelo_materno_arete = request.form.get('abuelo_materno_arete', '')
+        abuela_materna_arete = request.form.get('abuela_materna_arete', '')
+        observaciones = request.form.get('observaciones', '')
         
         db = get_db_connection()
         cursor = db.cursor()
@@ -2133,24 +1916,14 @@ def editar_genealogia(id):
         if not cursor.fetchone():
             raise Exception("Animal no encontrado")
         
-        # Si se especifica un padre, verificar que existe
-        if padre_id:
-            cursor.execute("SELECT id FROM animales WHERE id = %s", (padre_id,))
-            if not cursor.fetchone():
-                raise Exception("Padre no encontrado")
-        
-        # Si se especifica una madre, verificar que existe
-        if madre_id:
-            cursor.execute("SELECT id FROM animales WHERE id = %s", (madre_id,))
-            if not cursor.fetchone():
-                raise Exception("Madre no encontrada")
-        
         cursor.execute("""
             UPDATE genealogia 
-            SET animal_id = %s, padre_id = %s, madre_id = %s, 
-                caracteristicas_heredadas = %s
+            SET animal_id = %s, padre_arete = %s, madre_arete = %s,
+                abuelo_paterno_arete = %s, abuela_paterna_arete = %s,
+                abuelo_materno_arete = %s, abuela_materna_arete = %s, observaciones = %s
             WHERE id = %s
-        """, (animal_id, padre_id, madre_id, caracteristicas, id))
+        """, (animal_id, padre_arete, madre_arete, abuelo_paterno_arete,
+              abuela_paterna_arete, abuelo_materno_arete, abuela_materna_arete, observaciones, id))
         
         db.commit()
         flash('Registro genealógico actualizado exitosamente', 'success')
@@ -2310,7 +2083,7 @@ def ventas_leche():
         cursor.execute("""
             SELECT 
                 SUM(cantidad_litros) as total_litros,
-                SUM(total_venta) as total_ingresos
+                SUM(total) as total_ingresos
             FROM ventas_leche 
             WHERE DATE(fecha) = CURDATE()
         """)
@@ -2320,7 +2093,7 @@ def ventas_leche():
         cursor.execute("""
             SELECT 
                 SUM(cantidad_litros) as total_litros,
-                SUM(total_venta) as total_ingresos
+                SUM(total) as total_ingresos
             FROM ventas_leche 
             WHERE YEAR(fecha) = YEAR(CURDATE()) 
             AND MONTH(fecha) = MONTH(CURDATE())
@@ -2355,12 +2128,13 @@ def agregar_venta_leche():
         db = get_db_connection()
         cursor = db.cursor()
         
+        total = cantidad_litros * precio_litro
         cursor.execute("""
             INSERT INTO ventas_leche (
-                fecha, cantidad_litros, precio_litro,
+                fecha, cantidad_litros, precio_litro, total,
                 comprador, forma_pago, estado_pago
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-        """, (fecha, cantidad_litros, precio_litro,
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (fecha, cantidad_litros, precio_litro, total,
               comprador, forma_pago, estado_pago))
         
         db.commit()
@@ -2408,16 +2182,18 @@ def editar_venta_leche(id):
             db = get_db_connection()
             cursor = db.cursor()
             
+            total = cantidad_litros * precio_litro
             cursor.execute("""
                 UPDATE ventas_leche 
                 SET fecha = %s,
                     cantidad_litros = %s,
                     precio_litro = %s,
+                    total = %s,
                     comprador = %s,
                     forma_pago = %s,
                     estado_pago = %s
                 WHERE id = %s
-            """, (fecha, cantidad_litros, precio_litro, 
+            """, (fecha, cantidad_litros, precio_litro, total,
                   comprador, forma_pago, estado_pago, id))
             
             db.commit()
@@ -3367,10 +3143,6 @@ def agregar_registro_alimentacion():
     
     return redirect(url_for('registro_alimentacion'))
 
-# Función equipos eliminada para evitar problemas en el sistema
-
-# Función agregar_equipo eliminada para evitar problemas en el sistema
-
 @app.route('/mantenimientos')
 @login_required
 def mantenimientos():
@@ -3422,22 +3194,6 @@ def agregar_mantenimiento():
     
     return redirect(url_for('mantenimientos'))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @app.route('/clima')
 @login_required
 def clima():
@@ -3461,12 +3217,6 @@ def trazabilidad():
     eventos = cursor.fetchall()
     return render_template('trazabilidad.html', eventos=eventos)
 
-
-
-
-
-
-
 @app.route('/editar_pastizal/<int:pastizal_id>', methods=['POST'])
 @login_required
 def editar_pastizal(pastizal_id):
@@ -3480,9 +3230,9 @@ def editar_pastizal(pastizal_id):
         
         cursor.execute("""
             UPDATE pastizales 
-            SET nombre = %s, dimension = %s, tipo_hierba = %s 
+            SET nombre = %s, area = %s, descripcion = %s 
             WHERE id = %s AND usuario_id = %s
-        """, (nombre, dimension, tipo_hierba, pastizal_id, session['usuario_id']))
+        """, (nombre, dimension, f"Tipo de hierba: {tipo_hierba}", pastizal_id, session['usuario_id']))
         
         conn.commit()
         flash('Pastizal actualizado exitosamente', 'success')
@@ -3550,14 +3300,9 @@ def cambiar_estado_pastizal(pastizal_id):
         
         cursor.execute("""
             UPDATE pastizales 
-            SET estado = %s, 
-                fecha_ultimo_uso = CASE 
-                    WHEN %s = 'En regeneración' THEN CURRENT_DATE 
-                    ELSE fecha_ultimo_uso 
-                END,
-                fecha_disponible = %s
+            SET estado = %s
             WHERE id = %s AND usuario_id = %s
-        """, (nuevo_estado, nuevo_estado, fecha_disponible, pastizal_id, session['usuario_id']))
+        """, (nuevo_estado, pastizal_id, session['usuario_id']))
         
         conn.commit()
         flash('Estado del pastizal actualizado exitosamente', 'success')
@@ -3578,24 +3323,22 @@ def retirar_animales(pastizal_id):
     cursor = conn.cursor()
     
     try:
-        # Eliminar todas las asignaciones de animales para este pastizal
+        # Marcar todas las asignaciones de animales como retiradas para este pastizal
         cursor.execute("""
-            DELETE FROM pastizales_animales 
-            WHERE pastizal_id = %s
+            UPDATE animales_pastizal 
+            SET fecha_retiro = CURRENT_DATE
+            WHERE pastizal_id = %s AND fecha_retiro IS NULL
         """, (pastizal_id,))
         
-        # Actualizar el estado del pastizal a "En regeneración"
-        fecha_disponible = (datetime.now() + timedelta(days=30)).date()
+        # Actualizar el estado del pastizal a "Inactivo"
         cursor.execute("""
             UPDATE pastizales 
-            SET estado = 'En regeneración',
-                fecha_ultimo_uso = CURRENT_DATE,
-                fecha_disponible = %s
+            SET estado = 'Inactivo'
             WHERE id = %s AND usuario_id = %s
-        """, (fecha_disponible, pastizal_id, session['usuario_id']))
+        """, (pastizal_id, session['usuario_id']))
         
         conn.commit()
-        flash('Animales retirados exitosamente. El pastizal ha entrado en período de regeneración.', 'success')
+        flash('Animales retirados exitosamente del pastizal.', 'success')
         
     except Exception as e:
         conn.rollback()
@@ -3616,9 +3359,9 @@ def detalles_pastizal(pastizal_id):
         # Obtener detalles del pastizal
         cursor.execute("""
             SELECT p.*, 
-                   COUNT(DISTINCT pa.animal_id) as animales_actuales
+                   COUNT(DISTINCT ap.animal_id) as animales_actuales
             FROM pastizales p
-            LEFT JOIN pastizales_animales pa ON p.id = pa.pastizal_id
+            LEFT JOIN animales_pastizal ap ON p.id = ap.pastizal_id AND ap.fecha_retiro IS NULL
             WHERE p.id = %s AND p.usuario_id = %s
             GROUP BY p.id
         """, (pastizal_id, session['usuario_id']))
@@ -3631,11 +3374,11 @@ def detalles_pastizal(pastizal_id):
         
         # Obtener lista de animales en el pastizal
         cursor.execute("""
-            SELECT a.*, pa.fecha_ingreso
+            SELECT a.*, ap.fecha_asignacion
             FROM animales a
-            JOIN pastizales_animales pa ON a.id = pa.animal_id
-            WHERE pa.pastizal_id = %s
-            ORDER BY pa.fecha_ingreso DESC
+            JOIN animales_pastizal ap ON a.id = ap.animal_id
+            WHERE ap.pastizal_id = %s AND ap.fecha_retiro IS NULL
+            ORDER BY ap.fecha_asignacion DESC
         """, (pastizal_id,))
         
         animales = cursor.fetchall()
@@ -3902,7 +3645,7 @@ def actualizar_estado_inseminacion():
         if exitosa:
             # Verificar si ya existe una gestación para este animal que esté activa
             cursor.execute("""
-                SELECT id FROM gestacion 
+                SELECT id FROM gestaciones 
                 WHERE animal_id = %s AND estado = 'En Gestación'
             """, (inseminacion['animal_id'],))
             
@@ -3912,7 +3655,7 @@ def actualizar_estado_inseminacion():
                 fecha_probable_parto = fecha_inseminacion_obj + timedelta(days=283)
                 
                 cursor.execute("""
-                    INSERT INTO gestacion (
+                    INSERT INTO gestaciones (
                         animal_id, fecha_monta, fecha_probable_parto, observaciones, estado
                     ) VALUES (%s, %s, %s, %s, 'En Gestación')
                 """, (inseminacion['animal_id'], inseminacion['fecha_inseminacion'], 
@@ -3941,10 +3684,9 @@ def vitaminizacion():
         # Obtener todos los animales
         cursor.execute("""
             SELECT a.*, 
-                   (SELECT MAX(v.fecha_registro) 
-                    FROM vitaminizacion v 
-                    JOIN vitaminizacion_animal va ON v.id = va.vitaminizacion_id 
-                    WHERE va.animal_id = a.id) as ultima_vitaminizacion
+                   (SELECT MAX(v.fecha_aplicacion) 
+                    FROM vitaminizaciones v 
+                    WHERE v.animal_id = a.id) as ultima_vitaminizacion
             FROM animales a
             ORDER BY a.id DESC
         """)
@@ -3952,12 +3694,10 @@ def vitaminizacion():
         
         # Obtener registros de vitaminización
         cursor.execute("""
-            SELECT v.*, 
-                   (SELECT COUNT(*) 
-                    FROM vitaminizacion_animal va 
-                    WHERE va.vitaminizacion_id = v.id) as cantidad_animales
-            FROM vitaminizacion v
-            ORDER BY v.fecha_registro DESC
+            SELECT v.*, a.numero_arete, a.nombre, a.condicion
+            FROM vitaminizaciones v
+            JOIN animales a ON v.animal_id = a.id
+            ORDER BY v.fecha_aplicacion DESC
         """)
         registros = cursor.fetchall()
         
@@ -3979,25 +3719,28 @@ def registrar_vitaminizacion():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        fecha_registro = request.form.get('fecha_registro')
+        fecha_aplicacion = request.form.get('fecha_registro')
         producto = request.form.get('producto')
         tipo_aplicacion = request.form.get('tipo_aplicacion')
-        aplicador = request.form.get('aplicador')
-        proxima_aplicacion = (datetime.strptime(fecha_registro, '%Y-%m-%d') + timedelta(days=90)).strftime('%Y-%m-%d')
-        
-        cursor.execute("""
-            INSERT INTO vitaminizacion 
-            (fecha_registro, producto, aplicacion_general, aplicador, proxima_aplicacion)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (fecha_registro, producto, tipo_aplicacion == 'general', aplicador, proxima_aplicacion))
-        
-        vitaminizacion_id = cursor.lastrowid
+        dosis = request.form.get('dosis', '')
+        observaciones = request.form.get('observaciones', '')
+        proxima_aplicacion = (datetime.strptime(fecha_aplicacion, '%Y-%m-%d') + timedelta(days=90)).strftime('%Y-%m-%d')
         
         if tipo_aplicacion == 'general':
-            cursor.execute("INSERT INTO vitaminizacion_animal (vitaminizacion_id, animal_id) SELECT %s, id FROM animales", (vitaminizacion_id,))
+            # Aplicar a todos los animales
+            cursor.execute("""
+                INSERT INTO vitaminizaciones 
+                (animal_id, fecha_aplicacion, producto, dosis, fecha_proxima, observaciones, usuario_id)
+                SELECT id, %s, %s, %s, %s, %s, %s FROM animales
+            """, (fecha_aplicacion, producto, dosis, proxima_aplicacion, observaciones, session['user_id']))
         else:
+            # Aplicar solo a animales seleccionados
             for animal_id in request.form.getlist('animales_seleccionados[]'):
-                cursor.execute("INSERT INTO vitaminizacion_animal (vitaminizacion_id, animal_id) VALUES (%s, %s)", (vitaminizacion_id, animal_id))
+                cursor.execute("""
+                    INSERT INTO vitaminizaciones 
+                    (animal_id, fecha_aplicacion, producto, dosis, fecha_proxima, observaciones, usuario_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (animal_id, fecha_aplicacion, producto, dosis, proxima_aplicacion, observaciones, session['user_id']))
         
         conn.commit()
         flash('Vitaminización registrada exitosamente', 'success')
@@ -4017,9 +3760,11 @@ def detalles_vitaminizacion(id):
         cursor = conn.cursor(dictionary=True)
         
         cursor.execute("""
-            SELECT v.*, DATE_FORMAT(v.fecha_registro, '%d/%m/%Y') as fecha_registro_formato,
-                   DATE_FORMAT(v.proxima_aplicacion, '%d/%m/%Y') as proxima_aplicacion_formato
-            FROM vitaminizacion v
+            SELECT v.*, a.numero_arete, a.nombre, a.condicion,
+                   DATE_FORMAT(v.fecha_aplicacion, '%d/%m/%Y') as fecha_aplicacion_formato,
+                   DATE_FORMAT(v.fecha_proxima, '%d/%m/%Y') as proxima_aplicacion_formato
+            FROM vitaminizaciones v
+            JOIN animales a ON v.animal_id = a.id
             WHERE v.id = %s
         """, (id,))
         registro = cursor.fetchone()
@@ -4027,16 +3772,8 @@ def detalles_vitaminizacion(id):
         if not registro:
             return jsonify({'error': 'Registro no encontrado'}), 404
             
-        registro['fecha_registro'] = registro['fecha_registro_formato']
+        registro['fecha_aplicacion'] = registro['fecha_aplicacion_formato']
         registro['proxima_aplicacion'] = registro['proxima_aplicacion_formato']
-        
-        cursor.execute("""
-            SELECT a.* 
-            FROM animales a
-            JOIN vitaminizacion_animal va ON a.id = va.animal_id
-            WHERE va.vitaminizacion_id = %s
-        """, (id,))
-        registro['animales'] = cursor.fetchall()
         
         return jsonify(registro)
         
@@ -4053,11 +3790,8 @@ def eliminar_vitaminizacion(id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Primero eliminamos los registros relacionados en la tabla vitaminizacion_animal
-        cursor.execute("DELETE FROM vitaminizacion_animal WHERE vitaminizacion_id = %s", (id,))
-        
-        # Luego eliminamos el registro principal de vitaminizacion
-        cursor.execute("DELETE FROM vitaminizacion WHERE id = %s", (id,))
+        # Eliminar el registro de vitaminización
+        cursor.execute("DELETE FROM vitaminizaciones WHERE id = %s", (id,))
         
         conn.commit()
         flash('Registro de vitaminización eliminado exitosamente', 'success')
@@ -4133,7 +3867,7 @@ def registrar_carbunco():
         # Consulta corregida sin usuario_id
         cursor.execute("""
             INSERT INTO carbunco 
-            (fecha_registro, producto, lote, vacunador, aplicacion_general, proxima_aplicacion)
+            (fecha_registro, producto, lote, vacunador, aplicacion_general, fecha_proxima)
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (fecha_registro, producto, lote, vacunador, tipo_aplicacion == 'general', proxima_aplicacion))
         
@@ -4188,7 +3922,7 @@ def detalles_carbunco(id):
         # Obtener detalles del registro de carbunco
         cursor.execute("""
             SELECT c.*, DATE_FORMAT(c.fecha_registro, '%d/%m/%Y') as fecha_formato,
-                   DATE_FORMAT(c.proxima_aplicacion, '%d/%m/%Y') as proxima_aplicacion_formato
+                   DATE_FORMAT(c.fecha_proxima, '%d/%m/%Y') as proxima_aplicacion_formato
             FROM carbunco c
             WHERE c.id = %s
         """, (id,))
@@ -4243,8 +3977,12 @@ def init_db():
                 fecha_inseminacion DATE NOT NULL,
                 tipo_inseminacion VARCHAR(50) NOT NULL,
                 semental VARCHAR(100) NOT NULL,
+                raza_semental VARCHAR(100),
+                codigo_pajuela VARCHAR(100),
+                inseminador VARCHAR(100),
                 observaciones TEXT,
                 estado VARCHAR(50) DEFAULT 'Pendiente',
+                exitosa BOOLEAN DEFAULT FALSE,
                 fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (animal_id) REFERENCES animales(id)
             )
@@ -4276,30 +4014,90 @@ def init_db():
             )
         """)
         
-        # Lista de columnas a verificar y agregar si no existen
-        columnas = [
-            ("tipo_inseminacion", "VARCHAR(50) NOT NULL", "fecha_inseminacion"),
-            ("semental", "VARCHAR(100) NOT NULL", "tipo_inseminacion"),
-            ("estado", "VARCHAR(50) DEFAULT 'Pendiente'", "observaciones"),
-            ("exitosa", "BOOLEAN NULL", "observaciones")
-        ]
+        # Verificar si la tabla inseminaciones existe y tiene las columnas necesarias
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'inseminaciones'
+        """)
         
-        for columna, definicion, after in columnas:
-            # Verificar si la columna existe
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM information_schema.columns 
-                WHERE table_name = 'inseminaciones' 
-                AND column_name = %s
-            """, (columna,))
+        if cursor.fetchone()[0] == 0:
+            # La tabla no existe, ya se creó arriba
+            pass
+        else:
+            # Verificar si faltan columnas y agregarlas
+            columnas_faltantes = [
+                ("raza_semental", "VARCHAR(100)", "semental"),
+                ("codigo_pajuela", "VARCHAR(100)", "raza_semental"),
+                ("inseminador", "VARCHAR(100)", "codigo_pajuela"),
+                ("exitosa", "BOOLEAN DEFAULT FALSE", "observaciones")
+            ]
             
-            if cursor.fetchone()[0] == 0:
-                # Agregar columna si no existe
-                cursor.execute(f"""
-                    ALTER TABLE inseminaciones 
-                    ADD COLUMN {columna} {definicion} 
-                    AFTER {after}
-                """)
+            for columna, definicion, after in columnas_faltantes:
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'inseminaciones' 
+                    AND column_name = %s
+                """, (columna,))
+                
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute(f"""
+                        ALTER TABLE inseminaciones 
+                        ADD COLUMN {columna} {definicion} 
+                        AFTER {after}
+                    """)
+        
+        # Crear tabla de genealogía si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS genealogia (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                animal_id INT NOT NULL,
+                padre_arete VARCHAR(50),
+                madre_arete VARCHAR(50),
+                abuelo_paterno_arete VARCHAR(50),
+                abuela_paterna_arete VARCHAR(50),
+                abuelo_materno_arete VARCHAR(50),
+                abuela_materna_arete VARCHAR(50),
+                observaciones TEXT,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (animal_id) REFERENCES animales(id),
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de animales_pastizal si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS animales_pastizal (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                animal_id INT NOT NULL,
+                pastizal_id INT NOT NULL,
+                fecha_asignacion DATE NOT NULL,
+                fecha_retiro DATE,
+                observaciones TEXT,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (animal_id) REFERENCES animales(id),
+                FOREIGN KEY (pastizal_id) REFERENCES pastizales(id),
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de pastizales si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pastizales (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nombre VARCHAR(100) NOT NULL,
+                ubicacion TEXT,
+                area DECIMAL(10,2),
+                estado ENUM('Activo', 'Inactivo', 'Mantenimiento') DEFAULT 'Activo',
+                descripcion TEXT,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
         
         conn.commit()
         print("Base de datos inicializada correctamente")
@@ -4663,15 +4461,15 @@ def generar_reporte_gestacion():
         
         # Datos de la tabla
         for g in gestaciones:
-            # Calcular fecha probable de parto
-            fecha_probable = g['fecha_inseminacion'] + timedelta(days=283)
+            # Usar la fecha probable de parto almacenada en la base de datos
+            fecha_probable = g['fecha_probable_parto']
             dias_restantes = (fecha_probable - date.today()).days if g['estado'] == 'En Gestación' else 0
             
             row = [
                 str(g['numero_arete']),
                 str(g['nombre']),
                 str(g['estado']),
-                g['fecha_inseminacion'].strftime('%d/%m/%Y'),
+                g['fecha_monta'].strftime('%d/%m/%Y'),
                 fecha_probable.strftime('%d/%m/%Y'),
                 str(max(0, dias_restantes)) if g['estado'] == 'En Gestación' else '-'
             ]
@@ -4739,20 +4537,20 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
         
         # Construir la consulta base
         query = """
-            SELECT d.*, da.animal_id, a.numero_arete, a.nombre, a.condicion
-            FROM desparasitacion d
-            INNER JOIN desparasitacion_animal da ON d.id = da.desparasitacion_id
-            INNER JOIN animales a ON da.animal_id = a.id
-            WHERE 1 = 1
+            SELECT d.*, a.numero_arete, a.nombre, a.condicion
+            FROM desparasitaciones d
+            INNER JOIN animales a ON d.animal_id = a.id
+            WHERE d.usuario_id = %s
         """
+        params = [session['usuario_id']]
         params = []
         
         # Agregar filtro de fechas si se proporcionan
         if fecha_inicio and fecha_fin:
-            query += " AND d.fecha_registro BETWEEN %s AND %s"
+            query += " AND d.fecha_aplicacion BETWEEN %s AND %s"
             params.extend([fecha_inicio, fecha_fin])
             
-        query += " ORDER BY d.fecha_registro DESC"
+        query += " ORDER BY d.fecha_aplicacion DESC"
         
         cursor.execute(query, params)
         desparasitaciones = cursor.fetchall()
@@ -4865,13 +4663,13 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
         # Datos de la tabla
         for d in desparasitaciones:
             row = [
-                d['fecha_registro'].strftime('%d/%m/%Y'),
+                d['fecha_aplicacion'].strftime('%d/%m/%Y'),
                 str(d['numero_arete']),
                 str(d['nombre']),
                 str(d['condicion']),
                 str(d['producto']),
-                'N/A',  # La tabla no tiene campo de dosis
-                d['proxima_aplicacion'].strftime('%d/%m/%Y') if d['proxima_aplicacion'] else '-'
+                str(d['dosis']) if d['dosis'] else 'N/A',
+                d['fecha_proxima'].strftime('%d/%m/%Y') if d['fecha_proxima'] else '-'
             ]
             data.append(row)
         
@@ -4943,10 +4741,9 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
         
         # Construir la consulta base
         query = """
-            SELECT v.*, va.animal_id, a.numero_arete, a.nombre, a.condicion
-            FROM vitaminizacion v
-            INNER JOIN vitaminizacion_animal va ON v.id = va.vitaminizacion_id
-            INNER JOIN animales a ON va.animal_id = a.id
+            SELECT v.*, a.numero_arete, a.nombre, a.condicion
+            FROM vitaminizaciones v
+            INNER JOIN animales a ON v.animal_id = a.id
             WHERE 1 = 1
         """
         params = []
@@ -4959,10 +4756,10 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
             # Ajustar fecha_fin para incluir todo el día
             fecha_fin_dt = fecha_fin_dt.replace(hour=23, minute=59, second=59)
             
-            query += " AND DATE(v.fecha_registro) BETWEEN DATE(%s) AND DATE(%s)"
+            query += " AND DATE(v.fecha_aplicacion) BETWEEN DATE(%s) AND DATE(%s)"
             params.extend([fecha_inicio, fecha_fin])
             
-        query += " ORDER BY v.fecha_registro DESC"
+        query += " ORDER BY v.fecha_aplicacion DESC"
         
         cursor.execute(query, params)
         vitaminizaciones = cursor.fetchall()
@@ -5067,7 +4864,7 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
             "Nombre",
             "Tipo Animal",
             "Producto",
-            "Aplicador",
+            "Dosis",
             "Próxima Aplicación"
         ]
         data = [headers]
@@ -5075,13 +4872,13 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
         # Datos de la tabla
         for v in vitaminizaciones:
             row = [
-                v['fecha_registro'].strftime('%d/%m/%Y'),
+                v['fecha_aplicacion'].strftime('%d/%m/%Y'),
                 str(v['numero_arete']),
                 str(v['nombre']),
                 str(v['condicion']),
                 str(v['producto']),
-                str(v['aplicador']),
-                v['proxima_aplicacion'].strftime('%d/%m/%Y') if v['proxima_aplicacion'] else '-'
+                str(v['dosis'] or '-'),
+                v['fecha_proxima'].strftime('%d/%m/%Y') if v['fecha_proxima'] else '-'
             ]
             data.append(row)
         
@@ -5092,7 +4889,7 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
             doc.width * 0.18,  # Nombre
             doc.width * 0.15,  # Tipo Animal
             doc.width * 0.18,  # Producto
-            doc.width * 0.12,  # Aplicador
+            doc.width * 0.12,  # Dosis
             doc.width * 0.13   # Próxima Aplicación
         ]
         
@@ -5758,17 +5555,16 @@ def vista_registro_leche():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Obtener registros de leche agrupados por fecha y animal
+        # Obtener registros de leche
         cursor.execute('''
             SELECT 
                 animal_id, 
                 fecha,
-                MAX(CASE WHEN turno = 'Mañana' THEN cantidad ELSE 0 END) as cantidad_manana,
-                MAX(CASE WHEN turno = 'Tarde' THEN cantidad ELSE 0 END) as cantidad_tarde,
-                MAX(calidad) as calidad,
-                GROUP_CONCAT(DISTINCT observaciones SEPARATOR '; ') as observaciones
+                cantidad_manana,
+                cantidad_tarde,
+                total_dia,
+                observaciones
             FROM registro_leche
-            GROUP BY animal_id, fecha
             ORDER BY fecha DESC
         ''')
         registros = cursor.fetchall()
@@ -5791,7 +5587,7 @@ def vista_registro_leche():
             reg['fecha'] = reg['fecha'].strftime('%Y-%m-%d') if reg['fecha'] else 'N/A'
         
         # Obtener lista de animales para el formulario
-        cursor.execute('SELECT id, nombre, numero_arete FROM animales WHERE estado = "Activo"')
+        cursor.execute('SELECT id, nombre, numero_arete FROM animales WHERE sexo = "Hembra" AND condicion IN ("Vaca", "Vacona")')
         animales = cursor.fetchall()
         
         print('Registros encontrados:', len(registros))

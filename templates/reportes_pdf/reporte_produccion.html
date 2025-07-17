@@ -22,7 +22,7 @@
         {% for registro in registros_leche %}
         <tr>
             <td>{{ registro.fecha }}</td>
-            <td>{{ registro.cantidad }}</td>
+                                        <td>{{ registro.total_dia }}</td>
             <td>${{ registro.valor|round(2) }}</td>
         </tr>
         {% endfor %}

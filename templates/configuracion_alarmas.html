@@ -11,7 +11,7 @@
             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Volver al Dashboard
             </a>
-            <a href="{{ url_for('verificar_alarmas_manual') }}" class="btn btn-primary">
+            <a href="{{ url_for('verificar_alarmas') }}" class="btn btn-primary">
                 <i class="fas fa-bell"></i> Verificar Alarmas Ahora
             </a>
         </div>
@@ -39,6 +39,8 @@
                                 <option value="">Seleccione un tipo</option>
                                 <option value="parto">Partos Próximos</option>
                                 <option value="vacunacion">Vacunaciones Pendientes</option>
+                                <option value="desparasitacion">Desparasitaciones Pendientes</option>
+                                <option value="vitaminizacion">Vitaminizaciones Pendientes</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -169,7 +171,59 @@
                             </tr>
                             {% endif %}
                             
-                            {% if 'parto' not in config and 'vacunacion' not in config %}
+                            {% if 'desparasitacion' in config %}
+                            <tr>
+                                <td>Desparasitaciones Pendientes</td>
+                                <td>{{ config['desparasitacion'].email }}</td>
+                                <td>{{ config['desparasitacion'].dias_anticipacion }}</td>
+                                <td>
+                                    {% if config['desparasitacion'].activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if config['desparasitacion'].activo %}
+                                    <a href="{{ url_for('desactivar_alarma', tipo='desparasitacion') }}" class="btn btn-sm btn-danger">
+                                        Desactivar
+                                    </a>
+                                    {% else %}
+                                    <a href="{{ url_for('activar_alarma', tipo='desparasitacion') }}" class="btn btn-sm btn-success">
+                                        Activar
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            
+                            {% if 'vitaminizacion' in config %}
+                            <tr>
+                                <td>Vitaminizaciones Pendientes</td>
+                                <td>{{ config['vitaminizacion'].email }}</td>
+                                <td>{{ config['vitaminizacion'].dias_anticipacion }}</td>
+                                <td>
+                                    {% if config['vitaminizacion'].activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if config['vitaminizacion'].activo %}
+                                    <a href="{{ url_for('desactivar_alarma', tipo='vitaminizacion') }}" class="btn btn-sm btn-danger">
+                                        Desactivar
+                                    </a>
+                                    {% else %}
+                                    <a href="{{ url_for('activar_alarma', tipo='vitaminizacion') }}" class="btn btn-sm btn-success">
+                                        Activar
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            
+                            {% if 'parto' not in config and 'vacunacion' not in config and 'desparasitacion' not in config and 'vitaminizacion' not in config %}
                             <tr>
                                 <td colspan="5" class="text-center">No hay alarmas configuradas</td>
                             </tr>

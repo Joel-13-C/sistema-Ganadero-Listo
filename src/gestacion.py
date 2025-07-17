@@ -39,10 +39,10 @@ def registrar_gestacion(animal_id, fecha_monta, observaciones):
         
         # Insertar el registro de gestación
         cursor.execute("""
-            INSERT INTO gestaciones (animal_id, fecha_inseminacion, tipo_inseminacion, 
-                                semental, observaciones, estado)
-            VALUES (%s, %s, 'Natural', 'No especificado', %s, 'En Gestación')
-        """, (animal_id, fecha_monta, observaciones))
+            INSERT INTO gestaciones (animal_id, fecha_monta, tipo_inseminacion, 
+                                semental, observaciones, estado, fecha_probable_parto)
+            VALUES (%s, %s, 'Natural', 'No especificado', %s, 'En Gestación', %s)
+        """, (animal_id, fecha_monta, observaciones, fecha_probable_parto.strftime('%Y-%m-%d')))
         
         conn.commit()
         cursor.close()
@@ -70,8 +70,8 @@ def obtener_gestaciones():
         # Calcular días restantes para cada gestación y actualizar estado si es necesario
         for g in gestaciones:
             if g['estado'] == 'En Gestación':
-                # Calcular fecha probable de parto (283 días después de la inseminación)
-                fecha_probable_parto = g['fecha_inseminacion'] + timedelta(days=283)
+                # Usar la fecha probable de parto almacenada en la base de datos
+                fecha_probable_parto = g['fecha_probable_parto']
                 dias_restantes = (fecha_probable_parto - datetime.now().date()).days
                 g['dias_restantes'] = max(0, dias_restantes)
                 # Agregar la fecha probable de parto al diccionario para usarla en la plantilla
@@ -109,12 +109,12 @@ def obtener_gestaciones_proximas():
         # Obtener gestaciones que están a 7 días o menos del parto y aún están activas
         cursor.execute("""
             SELECT g.*, a.numero_arete, a.nombre, a.condicion,
-                   DATEDIFF(DATE_ADD(g.fecha_inseminacion, INTERVAL 283 DAY), CURDATE()) as dias_restantes
+                   DATEDIFF(g.fecha_probable_parto, CURDATE()) as dias_restantes
             FROM gestaciones g
             JOIN animales a ON g.animal_id = a.id
             WHERE g.estado = 'En Gestación'
-            AND DATEDIFF(DATE_ADD(g.fecha_inseminacion, INTERVAL 283 DAY), CURDATE()) BETWEEN 0 AND 7
-            ORDER BY g.fecha_inseminacion ASC
+            AND DATEDIFF(g.fecha_probable_parto, CURDATE()) BETWEEN 0 AND 7
+            ORDER BY g.fecha_probable_parto ASC
         """)
         
         gestaciones_proximas = cursor.fetchall()

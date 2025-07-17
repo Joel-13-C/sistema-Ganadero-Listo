@@ -458,9 +458,9 @@
                                 <div class="activity-item">
                                     <span>
                                         <strong>{{ parto.nombre_animal }}</strong> (Arete: {{ parto.numero_arete }})
-                                        <br><small>Fecha estimada: {{ (parto.fecha_inseminacion + timedelta(days=283)).strftime('%d/%m/%Y') }}</small>
+                                        <br><small>Fecha estimada: {{ parto.fecha_probable_parto.strftime('%d/%m/%Y') }}</small>
                                     </span>
-                                    <small class="text-muted">En {{ ((parto.fecha_inseminacion + timedelta(days=283)) - now.date()).days }} días</small>
+                                    <small class="text-muted">En {{ (parto.fecha_probable_parto - now.date()).days }} días</small>
                                 </div>
                                 {% endfor %}
                             {% else %}

@@ -7,6 +7,54 @@ Sistema integral para la gestión de ganado que permite el registro, seguimiento
 - MySQL 5.7+
 - pip (Gestor de paquetes de Python)
 
+## Configuración
+
+### Base de Datos
+1. Instalar MySQL
+2. Crear una base de datos llamada `sistema_ganadero2`
+3. Configurar MySQL con las siguientes credenciales:
+   - Usuario: root
+   - Contraseña: Cappa100..$$
+   - Host: localhost
+   - Base de datos: sistema_ganadero2
+4. Ejecutar el script `bd.sql` para crear las tablas necesarias
+
+### Configuración de Correo (Para notificaciones)
+El sistema está configurado para usar Gmail con las siguientes credenciales:
+```python
+email_config = {
+    'smtp_server': 'smtp.gmail.com',
+    'port': 587,
+    'username': 'p2pacademy.oficial@gmail.com',
+    'password': 'dtnf whvj oycf nhbb',
+    'from_email': 'p2pacademy.oficial@gmail.com'
+}
+```
+
+### Instalación
+
+1. Clonar el repositorio:
+   ```bash
+   git clone https://github.com/usuario/SistemaGanadero.git
+   cd SistemaGanadero
+   ```
+
+2. Crear un entorno virtual:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # En Windows: venv\Scripts\activate
+   ```
+
+3. Instalar dependencias:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Ejecutar la aplicación:
+   ```bash
+   python app.py
+   ```
+
 ## Características Principales
 
 ### Gestión de Animales
@@ -40,37 +88,19 @@ Sistema integral para la gestión de ganado que permite el registro, seguimiento
 - Protección de rutas
 - Auditoría de acciones
 
-## Configuración de Base de Datos
-1. Instalar MySQL
-2. Crear una base de datos llamada `sistema_ganadero`
-3. Configurar las credenciales en `src/database.py`
-4. La estructura de la base de datos se creará automáticamente al iniciar la aplicación
-
-## Instalación
-
-1. Clonar el repositorio
-   ```bash
-   git clone https://github.com/usuario/SistemaGanadero.git
-   cd SistemaGanadero
-   ```
-
-2. Crear un entorno virtual:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
-   ```
-
-3. Instalar dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configurar credenciales de base de datos en `src/database.py`
-
-5. Ejecutar la aplicación:
-   ```bash
-   python app.py
-   ```
+## Estructura del Proyecto
+- `app.py`: Punto de entrada principal
+- `src/`: Módulos y componentes del sistema
+  - `database.py`: Conexión y operaciones de base de datos
+  - `alarmas.py`: Sistema de alertas y notificaciones
+  - `auditoria.py`: Registro de actividades
+  - `routes/`: Rutas y controladores
+- `templates/`: Plantillas HTML
+- `static/`: Archivos estáticos (CSS, JS, imágenes)
+  - `uploads/`: Directorio para almacenar imágenes subidas
+    - `animales/`: Fotos de animales
+    - `perfiles/`: Fotos de perfil
+  - `comprobantes/`: Comprobantes y documentos
 
 ## Tecnologías Utilizadas
 - **Backend**: Flask (Python)
@@ -79,13 +109,7 @@ Sistema integral para la gestión de ganado que permite el registro, seguimiento
 - **Reportes**: ReportLab
 - **Gráficos**: Chart.js
 - **Programación de tareas**: APScheduler
-
-## Estructura del Proyecto
-- `app.py`: Punto de entrada principal
-- `src/`: Módulos y componentes del sistema
-- `templates/`: Plantillas HTML
-- `static/`: Archivos estáticos (CSS, JS, imágenes)
-- `uploads/`: Directorio para almacenar imágenes subidas
+- **Almacenamiento de imágenes**: Cloudinary
 
 ## Contribución
 Si deseas contribuir al proyecto, por favor:
@@ -97,8 +121,3 @@ Si deseas contribuir al proyecto, por favor:
 
 ## Licencia
 Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para más detalles.
-- Flask
-- MySQL
-- HTML5
-- CSS3
-- JavaScript

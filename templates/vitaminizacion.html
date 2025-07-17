@@ -297,10 +297,21 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label for="aplicador" class="form-label">Aplicador</label>
+                                    <label for="dosis" class="form-label">Dosis</label>
                                     <div class="input-group">
-                                        <span class="input-group-text"><i class="ri-user-line"></i></span>
-                                        <input type="text" class="form-control" id="aplicador" name="aplicador" required>
+                                        <span class="input-group-text"><i class="ri-medicine-bottle-line"></i></span>
+                                        <input type="text" class="form-control" id="dosis" name="dosis" placeholder="Ej: 5ml">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="observaciones" class="form-label">Observaciones</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="ri-edit-line"></i></span>
+                                        <textarea class="form-control" id="observaciones" name="observaciones" rows="3" placeholder="Observaciones adicionales..."></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -410,10 +421,11 @@
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
+                                    <th>N° Arete</th>
+                                    <th>Nombre</th>
+                                    <th>Tipo Animal</th>
                                     <th>Producto</th>
-                                    <th>Aplicador</th>
-                                    <th>Tipo</th>
-                                    <th>Animales</th>
+                                    <th>Dosis</th>
                                     <th>Próxima Aplicación</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -421,31 +433,20 @@
                             <tbody>
                                 {% for registro in registros %}
                                 <tr>
-                                    <td>{{ registro.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ registro.fecha_aplicacion.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ registro.numero_arete }}</td>
+                                    <td>{{ registro.nombre }}</td>
+                                    <td>{{ registro.condicion }}</td>
                                     <td>{{ registro.producto }}</td>
-                                    <td>{{ registro.aplicador }}</td>
+                                    <td>{{ registro.dosis or '-' }}</td>
                                     <td>
-                                        {% if registro.aplicacion_general %}
-                                            <span class="badge bg-success">General</span>
-                                        {% else %}
-                                            <span class="badge bg-info">Específica</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if registro.aplicacion_general %}
-                                            <span class="badge bg-light text-dark">Todos</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark">{{ registro.cantidad_animales }} animales</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if registro.proxima_aplicacion < hoy %}
+                                        {% if registro.fecha_proxima < hoy %}
                                             <span class="proxima-vencida">
-                                                <i class="ri-error-warning-line"></i> {{ registro.proxima_aplicacion.strftime('%d/%m/%Y') }}
+                                                <i class="ri-error-warning-line"></i> {{ registro.fecha_proxima.strftime('%d/%m/%Y') }}
                                             </span>
                                         {% else %}
                                             <span class="proxima-vigente">
-                                                <i class="ri-check-line"></i> {{ registro.proxima_aplicacion.strftime('%d/%m/%Y') }}
+                                                <i class="ri-check-line"></i> {{ registro.fecha_proxima.strftime('%d/%m/%Y') }}
                                             </span>
                                         {% endif %}
                                     </td>
@@ -663,63 +664,51 @@ function verDetalles(id) {
                 <div class="table-responsive">
                     <table class="table">
                         <tr>
-                            <th style="width: 200px;"><i class="ri-calendar-line me-2"></i>Fecha de Registro:</th>
-                            <td>${data.fecha_registro}</td>
+                            <th style="width: 200px;"><i class="ri-calendar-line me-2"></i>Fecha de Aplicación:</th>
+                            <td>${data.fecha_aplicacion}</td>
                         </tr>
                         <tr>
                             <th><i class="ri-medicine-bottle-line me-2"></i>Producto:</th>
                             <td>${data.producto}</td>
                         </tr>
                         <tr>
-                            <th><i class="ri-user-line me-2"></i>Aplicador:</th>
-                            <td>${data.aplicador}</td>
+                            <th><i class="ri-medicine-bottle-line me-2"></i>Dosis:</th>
+                            <td>${data.dosis || '-'}</td>
                         </tr>
                         <tr>
                             <th><i class="ri-calendar-check-line me-2"></i>Próxima Aplicación:</th>
                             <td>${data.proxima_aplicacion}</td>
                         </tr>
+                        <tr>
+                            <th><i class="ri-edit-line me-2"></i>Observaciones:</th>
+                            <td>${data.observaciones || '-'}</td>
+                        </tr>
                     </table>
                 </div>
             `;
             
-            // Agregar la sección de animales tratados si existen
-            if (data.animales && data.animales.length > 0) {
-                contenidoHTML += `
-                <div class="mt-4">
-                    <h6 class="section-title">Animales Tratados</h6>
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Número de Arete</th>
-                                    <th>Condición</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                
-                // Crear las filas de la tabla de animales
-                data.animales.forEach(animal => {
-                    const identificacion = animal.numero_arete !== undefined ? animal.numero_arete : 'No disponible';
-                    const categoria = animal.condicion !== undefined ? animal.condicion : 'No disponible';
-                    
-                    contenidoHTML += `
-                    <tr>
-                        <td>${animal.id}</td>
-                        <td>${identificacion}</td>
-                        <td>${categoria}</td>
-                    </tr>
-                    `;
-                });
-                
-                contenidoHTML += `
-                            </tbody>
-                        </table>
-                    </div>
+            // Agregar información del animal tratado
+            contenidoHTML += `
+            <div class="mt-4">
+                <h6 class="section-title">Información del Animal</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <tr>
+                            <th>Número de Arete:</th>
+                            <td>${data.numero_arete}</td>
+                        </tr>
+                        <tr>
+                            <th>Nombre:</th>
+                            <td>${data.nombre}</td>
+                        </tr>
+                        <tr>
+                            <th>Condición:</th>
+                            <td>${data.condicion}</td>
+                        </tr>
+                    </table>
                 </div>
-                `;
-            }
+            </div>
+            `;
             
             document.getElementById('detallesContenido').innerHTML = contenidoHTML;
         })

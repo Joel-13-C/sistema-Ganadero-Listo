@@ -36,7 +36,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase mb-1">Disponibles</h6>
-                            <h2 class="mb-0">{{ pastizales|selectattr('estado', 'equalto', 'Disponible')|list|length }}</h2>
+                            <h2 class="mb-0">{{ pastizales|selectattr('estado', 'equalto', 'Activo')|list|length }}</h2>
                         </div>
                         <div class="icon-circle bg-white bg-opacity-25">
                             <i class="fas fa-check-circle fa-2x text-white"></i>
@@ -51,7 +51,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-uppercase mb-1">En Uso</h6>
-                            <h2 class="mb-0">{{ pastizales|selectattr('estado', 'equalto', 'En uso')|list|length }}</h2>
+                            <h2 class="mb-0">{{ pastizales|selectattr('animales_actuales', 'gt', 0)|list|length }}</h2>
                         </div>
                         <div class="icon-circle bg-white bg-opacity-25">
                             <i class="fas fa-cow fa-2x text-white"></i>
@@ -94,9 +94,9 @@
                 <div class="col-md-3">
                     <select id="filtroEstado" class="form-select">
                         <option value="">Todos los estados</option>
-                        <option value="Disponible">Disponible</option>
-                        <option value="En uso">En uso</option>
-                        <option value="En descanso">En descanso</option>
+                        <option value="Activo">Activo</option>
+                        <option value="Inactivo">Inactivo</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -155,25 +155,26 @@
                                     <span class="fw-bold">{{ pastizal.nombre }}</span>
                                 </div>
                             </td>
-                            <td>{{ pastizal.dimension }} m²</td>
-                            <td>{{ pastizal.tipo_hierba }}</td>
+                            <td>{{ pastizal.area }} m²</td>
+                            <td>{{ pastizal.descripcion.split(': ')[1] if pastizal.descripcion and ': ' in pastizal.descripcion else 'N/A' }}</td>
                             <td>
-                                <span class="badge rounded-pill {% if pastizal.estado == 'Disponible' %}bg-success{% elif pastizal.estado == 'En uso' %}bg-primary{% else %}bg-warning{% endif %} px-3 py-2">
-                                    {% if pastizal.estado == 'Disponible' %}
+                                <span class="badge rounded-pill {% if pastizal.estado == 'Activo' %}bg-success{% elif pastizal.animales_actuales > 0 %}bg-primary{% else %}bg-warning{% endif %} px-3 py-2">
+                                    {% if pastizal.estado == 'Activo' %}
                                         <i class="fas fa-check-circle me-1"></i>
-                                    {% elif pastizal.estado == 'En uso' %}
+                                    {% elif pastizal.animales_actuales > 0 %}
                                         <i class="fas fa-cow me-1"></i>
                                     {% else %}
                                         <i class="fas fa-clock me-1"></i>
                                     {% endif %}
-                                    {{ pastizal.estado }}
+                                    {{ 'En uso' if pastizal.animales_actuales > 0 else pastizal.estado }}
                                 </span>
                             </td>
-                            <td>{{ pastizal.capacidad_maxima }}</td>
+                            <td>{{ (pastizal.area / 3.5)|round|int if pastizal.area else 0 }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
                                     <div class="progress flex-grow-1 me-2" style="height: 10px;">
-                                        {% set porcentaje = (pastizal.animales_actuales / pastizal.capacidad_maxima * 100)|round|int if pastizal.capacidad_maxima > 0 else 0 %}
+                                        {% set capacidad_maxima = (pastizal.area / 3.5)|round|int if pastizal.area else 0 %}
+                                        {% set porcentaje = (pastizal.animales_actuales / capacidad_maxima * 100)|round|int if capacidad_maxima > 0 else 0 %}
                                         <div class="progress-bar {% if porcentaje < 50 %}bg-success{% elif porcentaje < 80 %}bg-info{% else %}bg-danger{% endif %}" 
                                              role="progressbar" 
                                              style="width: {{ porcentaje }}%" 
@@ -181,15 +182,11 @@
                                              aria-valuemin="0" 
                                              aria-valuemax="100"></div>
                                     </div>
-                                    <span class="badge bg-secondary">{{ pastizal.animales_actuales }}/{{ pastizal.capacidad_maxima }}</span>
+                                    <span class="badge bg-secondary">{{ pastizal.animales_actuales }}/{{ (pastizal.area / 3.5)|round|int if pastizal.area else 0 }}</span>
                                 </div>
                             </td>
                             <td>
-                                {% if pastizal.fecha_ultimo_uso %}
-                                <span class="text-muted"><i class="far fa-calendar-alt me-1"></i>{{ pastizal.fecha_ultimo_uso.strftime('%d/%m/%Y') }}</span>
-                                {% else %}
                                 <span class="text-muted">-</span>
-                                {% endif %}
                             </td>
                             <td>
                                 <div class="btn-group">
@@ -200,7 +197,7 @@
                                         <i class="fas fa-eye"></i>
                                     </a>
 
-                                    {% if pastizal.estado == 'Disponible' %}
+                                    {% if pastizal.estado == 'Activo' %}
                                     <!-- Asignar Animales -->
                                     <button type="button" 
                                             class="btn btn-sm btn-outline-success" 
@@ -210,7 +207,7 @@
                                     </button>
                                     {% endif %}
 
-                                    {% if pastizal.estado == 'En uso' %}
+                                    {% if pastizal.animales_actuales > 0 %}
                                     <!-- Retirar Animales -->
                                     <button type="button" 
                                             class="btn btn-sm btn-outline-warning" 
@@ -262,7 +259,7 @@
                             <input type="text" class="form-control" id="nombre" name="nombre" required>
                         </div>
                         <div class="mb-3">
-                            <label for="dimension" class="form-label">Dimensión (m²)</label>
+                            <label for="dimension" class="form-label">Área (m²)</label>
                             <input type="number" step="0.01" class="form-control" id="dimension" name="dimension" required>
                             <small class="text-muted">Se requieren 3.5m² por animal</small>
                         </div>
@@ -536,8 +533,11 @@ function filtrarPastizales() {
         }
         
         // Filtro de estado
-        if (filtroEstado && !estado.includes(filtroEstado.toLowerCase())) {
-            mostrar = false;
+        if (filtroEstado) {
+            const estadoMostrado = estado.includes('uso') ? 'En uso' : estado;
+            if (!estadoMostrado.toLowerCase().includes(filtroEstado.toLowerCase())) {
+                mostrar = false;
+            }
         }
         
         // Filtro de tipo de hierba

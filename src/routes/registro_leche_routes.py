@@ -3,6 +3,7 @@ from functools import wraps
 from datetime import datetime
 import mysql.connector
 from mysql.connector import Error
+import os
 
 # Crear el blueprint para registro_leche
 registro_leche_bp = Blueprint('registro_leche', __name__)
@@ -13,8 +14,8 @@ def get_db_connection():
         conn = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='1234',
-            database='sistema_ganadero'
+            password='Cappa100..$$',  # Tu contraseña de MySQL
+            database='sistema_ganadero2'
         )
         return conn
     except Error as e:
@@ -65,7 +66,7 @@ def vista_registro_leche():
             query += " AND rl.animal_id = %s"
             params.append(animal_id)
             
-        query += " ORDER BY rl.fecha DESC, rl.turno"
+        query += " ORDER BY rl.fecha DESC"
         
         cursor.execute(query, params)
         registros = cursor.fetchall()
@@ -104,7 +105,6 @@ def nuevo_registro_leche():
         fecha = request.form['fecha']
         cantidad_manana = request.form.get('cantidad_manana', 0)
         cantidad_tarde = request.form.get('cantidad_tarde', 0)
-        turno = 'Ambos'  # Por defecto, asumimos que se registran ambos turnos
         calidad = request.form.get('calidad', 'A')
         observaciones = request.form.get('observaciones', '')
         
@@ -140,9 +140,9 @@ def nuevo_registro_leche():
         # Insertar nuevo registro
         cursor.execute("""
             INSERT INTO registro_leche 
-            (animal_id, usuario_id, fecha, cantidad, turno, calidad, observaciones) 
+            (animal_id, usuario_id, fecha, cantidad_manana, cantidad_tarde, total_dia, observaciones) 
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (animal_id, session['usuario_id'], fecha, cantidad_total, turno, calidad, observaciones))
+        """, (animal_id, session['usuario_id'], fecha, cantidad_manana, cantidad_tarde, cantidad_total, observaciones))
         
         conn.commit()
         flash('Registro de producción de leche agregado exitosamente', 'success')
@@ -170,10 +170,19 @@ def actualizar_registro_leche(registro_id):
         # Obtener datos del formulario
         animal_id = request.form['animal_id']
         fecha = request.form['fecha']
-        cantidad = request.form['cantidad']
-        turno = request.form.get('turno', 'Ambos')
+        cantidad_manana = request.form.get('cantidad_manana', 0)
+        cantidad_tarde = request.form.get('cantidad_tarde', 0)
         calidad = request.form.get('calidad', 'A')
         observaciones = request.form.get('observaciones', '')
+        
+        # Convertir cantidades a decimal
+        try:
+            cantidad_manana = float(cantidad_manana)
+            cantidad_tarde = float(cantidad_tarde)
+            cantidad_total = cantidad_manana + cantidad_tarde
+        except ValueError:
+            flash('Las cantidades deben ser números válidos', 'danger')
+            return redirect(url_for('registro_leche.vista_registro_leche'))
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -181,10 +190,10 @@ def actualizar_registro_leche(registro_id):
         # Actualizar registro
         cursor.execute("""
             UPDATE registro_leche 
-            SET animal_id = %s, fecha = %s, cantidad = %s, 
-                turno = %s, calidad = %s, observaciones = %s
+            SET animal_id = %s, fecha = %s, cantidad_manana = %s, cantidad_tarde = %s, 
+                total_dia = %s, observaciones = %s
             WHERE id = %s
-        """, (animal_id, fecha, cantidad, turno, calidad, observaciones, registro_id))
+        """, (animal_id, fecha, cantidad_manana, cantidad_tarde, cantidad_total, observaciones, registro_id))
         
         conn.commit()
         flash('Registro actualizado exitosamente', 'success')
@@ -255,8 +264,8 @@ def obtener_registro_leche(registro_id):
             registro['fecha'] = registro['fecha'].strftime('%Y-%m-%d')
         
         # Asegurar que todos los campos necesarios estén presentes
-        if 'cantidad' not in registro or registro['cantidad'] is None:
-            registro['cantidad'] = 0.0
+        if 'total_dia' not in registro or registro['total_dia'] is None:
+            registro['total_dia'] = 0.0
         
         if 'calidad' not in registro or not registro['calidad']:
             registro['calidad'] = 'A'

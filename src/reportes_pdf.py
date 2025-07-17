@@ -368,7 +368,7 @@ def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=
         registros_leche = cursor.fetchall()
         
         # Calcular totales
-        total_leche = sum(float(registro['cantidad']) for registro in registros_leche)
+        total_leche = sum(float(registro['total_dia']) for registro in registros_leche)
         dias_periodo = (fecha_fin - fecha_inicio).days + 1
         promedio_diario = total_leche / dias_periodo if dias_periodo > 0 else 0
         
@@ -386,7 +386,7 @@ def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=
         produccion_por_animal = []
         cursor.execute("""
             SELECT a.nombre_arete as nombre, 
-                   SUM(rl.cantidad) as total,
+                   SUM(rl.total_dia) as total,
                    COUNT(DISTINCT rl.fecha) as dias
             FROM registro_leche rl
             JOIN animales a ON rl.animal_id = a.id
@@ -405,7 +405,7 @@ def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=
         
         # Añadir valor estimado a cada registro
         for registro in registros_leche:
-            registro['valor'] = float(registro['cantidad']) * precio_promedio
+            registro['valor'] = float(registro['total_dia']) * precio_promedio
         
         # Renderizar la plantilla HTML
         html = render_template('reportes_pdf/reporte_produccion.html',

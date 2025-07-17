@@ -442,8 +442,8 @@
                             <th>Fecha</th>
                             <th>Producto</th>
                             <th>Tipo</th>
-                            <th>Animales</th>
-                            <th>Vacunador</th>
+                            <th>Animal</th>
+                            <th>Observaciones</th>
                             <th>Próxima Aplicación</th>
                             <th>Acciones</th>
                         </tr>
@@ -451,32 +451,28 @@
                     <tbody>
                         {% for registro in registros %}
                         <tr>
-                            <td>{{ registro.fecha_registro }}</td>
+                            <td>{{ registro.fecha_aplicacion_formato }}</td>
                             <td>{{ registro.producto }}</td>
                             <td>
-                                {% if registro.aplicacion_general %}
-                                    <span class="badge bg-success">General</span>
-                                {% else %}
-                                    <span class="badge bg-info">Específica</span>
-                                {% endif %}
+                                <span class="badge bg-info">Individual</span>
                             </td>
                             <td>
-                                {% if registro.aplicacion_general %}
-                                <span class="badge bg-light text-dark">Todos</span>
-                                {% else %}
-                                <span class="badge bg-light text-dark">{{ registro.cantidad_animales }} animales</span>
-                                {% endif %}
+                                <span class="badge bg-light text-dark">{{ registro.nombre_animal }}</span>
                             </td>
-                            <td>{{ registro.vacunador }}</td>
+                            <td>{{ registro.observaciones or 'N/A' }}</td>
                             <td>
-                                {% if registro.proxima_aplicacion < hoy %}
-                                <span class="proxima-vencida">
-                                    <i class="ri-error-warning-line"></i> {{ registro.proxima_aplicacion }}
-                                </span>
+                                {% if registro.fecha_proxima %}
+                                    {% if registro.fecha_proxima < hoy %}
+                                    <span class="proxima-vencida">
+                                        <i class="ri-error-warning-line"></i> {{ registro.fecha_proxima_formato }}
+                                    </span>
+                                    {% else %}
+                                    <span class="proxima-vigente">
+                                        <i class="ri-check-line"></i> {{ registro.fecha_proxima_formato }}
+                                    </span>
+                                    {% endif %}
                                 {% else %}
-                                <span class="proxima-vigente">
-                                    <i class="ri-check-line"></i> {{ registro.proxima_aplicacion }}
-                                </span>
+                                    <span class="text-muted">No programada</span>
                                 {% endif %}
                             </td>
                             <td>

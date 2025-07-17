@@ -161,17 +161,17 @@
                                         </div>
                                     </td>
                                     <td>
-                                        {% if g.fecha_inseminacion is defined and g.fecha_inseminacion is not none %}
-                                            {% if g.fecha_inseminacion is string %}
-                                                {{ g.fecha_inseminacion }}
+                                        {% if g.fecha_monta is defined and g.fecha_monta is not none %}
+                                            {% if g.fecha_monta is string %}
+                                                {{ g.fecha_monta }}
                                             {% else %}
-                                                {{ g.fecha_inseminacion.strftime('%d/%m/%Y') }}
+                                                {{ g.fecha_monta.strftime('%d/%m/%Y') }}
                                             {% endif %}
-                                        {% elif g.get and g.get('fecha_inseminacion') %}
-                                            {% if g.get('fecha_inseminacion') is string %}
-                                                {{ g.get('fecha_inseminacion') }}
+                                        {% elif g.get and g.get('fecha_monta') %}
+                                            {% if g.get('fecha_monta') is string %}
+                                                {{ g.get('fecha_monta') }}
                                             {% else %}
-                                                {{ g.get('fecha_inseminacion').strftime('%d/%m/%Y') }}
+                                                {{ g.get('fecha_monta').strftime('%d/%m/%Y') }}
                                             {% endif %}
                                         {% else %}
                                             -
@@ -666,7 +666,7 @@ function showDayDetails(date) {
     if (hasEvent) {
         Swal.fire({
             title: 'Inseminaciones del ' + formattedDate,
-            html: '<div class="text-start"><p><strong>Animal:</strong> Vaca #1234 - Manchas</p>' +
+            html: '<div class="text-start"><p><strong>Animal:</strong> Vaca #Cappa100..$$ - Manchas</p>' +
                   '<p><strong>Tipo:</strong> Artificial</p>' +
                   '<p><strong>Semental:</strong> Pajuela A-567</p></div>',
             icon: 'info',
