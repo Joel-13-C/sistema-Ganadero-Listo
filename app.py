@@ -3056,11 +3056,11 @@ def reportes_financieros():
         fecha_actual = datetime.now()
         
         # Obtener los parámetros de filtrado
-        año_filtro = request.args.get('anio', str(fecha_actual.year))
+        anio_filtro = request.args.get('anio', str(fecha_actual.year))
         mes_filtro = request.args.get('mes', str(fecha_actual.month))
         
         # Convertir a enteros
-        año_actual = int(año_filtro)
+        anio_actual = int(anio_filtro)
         mes_actual = int(mes_filtro)
         
         # Nombres de los meses en español
@@ -3085,7 +3085,7 @@ def reportes_financieros():
                 AND EXTRACT(MONTH FROM i.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
-        """, (año_actual, mes_actual))
+        """, (anio_actual, mes_actual))
         ingresos_por_categoria = cursor.fetchall()
         
         # Obtener gastos por categoría para el mes seleccionado
@@ -3099,7 +3099,7 @@ def reportes_financieros():
                 AND EXTRACT(MONTH FROM g.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
-        """, (año_actual, mes_actual))
+        """, (anio_actual, mes_actual))
         gastos_por_categoria = cursor.fetchall()
         
         # Calcular totales generales
@@ -3107,14 +3107,14 @@ def reportes_financieros():
             SELECT COALESCE(SUM(monto), 0) as total
             FROM ingresos 
             WHERE EXTRACT(YEAR FROM fecha) = %s
-        """, (año_actual,))
+        """, (anio_actual,))
         total_ingresos_anual = float(cursor.fetchone()['total'])
         
         cursor.execute("""
             SELECT COALESCE(SUM(monto), 0) as total
             FROM gastos 
             WHERE EXTRACT(YEAR FROM fecha) = %s
-        """, (año_actual,))
+        """, (anio_actual,))
         total_gastos_anual = float(cursor.fetchone()['total'])
         
         balance_anual = total_ingresos_anual - total_gastos_anual
@@ -3122,7 +3122,7 @@ def reportes_financieros():
         # Ya no necesitamos preparar datos para las gráficas
         
         return render_template('reportes_financieros.html', 
-                               año_actual=año_actual,
+                               anio_actual=anio_actual,
                                mes_actual=mes_actual,
                                nombre_mes_actual=nombre_mes_actual,
                                ingresos_por_categoria=ingresos_por_categoria,
@@ -3170,11 +3170,11 @@ def descargar_reporte_pdf():
         cursor = db.cursor()
         
         # Obtener los parámetros de filtrado
-        año_filtro = request.args.get('anio', str(datetime.now().year))
+        anio_filtro = request.args.get('anio', str(datetime.now().year))
         mes_filtro = request.args.get('mes', str(datetime.now().month))
         
         # Convertir a enteros
-        año = int(año_filtro)
+        anio = int(anio_filtro)
         mes = int(mes_filtro)
         
         # Nombres de los meses en español
@@ -3197,7 +3197,7 @@ def descargar_reporte_pdf():
                 AND EXTRACT(MONTH FROM i.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
-        """, (año, mes))
+        """, (anio, mes))
         ingresos_por_categoria = cursor.fetchall()
         
         # Obtener gastos por categoría para el mes seleccionado
@@ -3211,7 +3211,7 @@ def descargar_reporte_pdf():
                 AND EXTRACT(MONTH FROM g.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
-        """, (año, mes))
+        """, (anio, mes))
         gastos_por_categoria = cursor.fetchall()
         
         # Calcular totales
@@ -3222,7 +3222,7 @@ def descargar_reporte_pdf():
         # Preparar contexto para la plantilla
         context = {
             'nombre_mes': nombre_mes,
-            'año': año,
+            'anio': anio,
             'total_ingresos': total_ingresos,
             'total_gastos': total_gastos,
             'balance': balance,
@@ -3230,7 +3230,7 @@ def descargar_reporte_pdf():
             'gastos_por_categoria': gastos_por_categoria,
             'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             'titulo': "SISTEMA GANADERO FINCA ABIGAIL",
-            'subtitulo': f"Reporte Financiero - {nombre_mes} {año}"
+            'subtitulo': f"Reporte Financiero - {nombre_mes} {anio}"
         }
         
         # Generar PDF usando xhtml2pdf
@@ -4591,21 +4591,6 @@ def generar_reporte_pdf(tipo):
             cursor.close()
         if conn:
             conn.close()
-        
-        app.logger.info('PDF generado exitosamente')
-        return response
-        
-    except Exception as e:
-        app.logger.error(f'Error al generar reporte PDF: {str(e)}')
-        app.logger.error('Traceback completo:', exc_info=True)
-        flash(f'Error al generar el reporte PDF: {str(e)}', 'error')
-        return redirect(url_for('animales'))
-        
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
 
 @app.route('/generar_reporte_gestacion')
 @login_required
@@ -4684,6 +4669,11 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
         app.logger.error(f'Error al generar reporte de desparasitación: {str(e)}')
         flash('Error al generar el reporte PDF', 'error')
         return redirect(url_for('desparasitacion'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 @app.route('/generar_reporte_vitaminizacion')
@@ -4796,16 +4786,6 @@ def generar_certificado_aftosa(certificado_id):
     except Exception as e:
         app.logger.error(f'Error al generar certificado de aftosa: {str(e)}')
         flash('Error al generar el certificado PDF', 'error')
-        return redirect(url_for('fiebre_aftosa'))
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-        app.logger.error(f'Error al generar certificado PDF: {str(e)}')
-        app.logger.error('Traceback completo:', exc_info=True)
-        flash(f'Error al generar el certificado PDF: {str(e)}', 'error')
         return redirect(url_for('fiebre_aftosa'))
     finally:
         if cursor:
