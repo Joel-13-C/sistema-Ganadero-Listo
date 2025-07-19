@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from functools import wraps
 from datetime import datetime
-import mysql.connector
-from mysql.connector import Error
+import psycopg2
+import psycopg2.extras
 import os
 
 # Crear el blueprint para registro_leche
@@ -11,14 +11,10 @@ registro_leche_bp = Blueprint('registro_leche', __name__)
 # Función para obtener conexión a la base de datos
 def get_db_connection():
     try:
-        conn = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='Cappa100..$$',  # Tu contraseña de MySQL
-            database='sistema_ganadero2'
-        )
+        db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
+        conn = psycopg2.connect(db_url)
         return conn
-    except Error as e:
+    except psycopg2.Error as e:
         print(f"Error al conectar a la base de datos: {e}")
         return None
 
@@ -42,7 +38,7 @@ def vista_registro_leche():
             flash('Error al conectar con la base de datos', 'danger')
             return render_template('registro_leche.html', registros=[], animales=[])
             
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -245,7 +241,7 @@ def obtener_registro_leche(registro_id):
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT rl.*, a.nombre as nombre_animal 

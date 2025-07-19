@@ -1,7 +1,7 @@
 from flask import Flask
-from flask_mysqldb import MySQL
+import psycopg2
+import psycopg2.extras
 import hashlib
-import mysql.connector
 import sys
 import logging
 from datetime import datetime, timedelta
@@ -18,55 +18,20 @@ logger = logging.getLogger(__name__)
 class DatabaseConnection:
     def __init__(self, app):
         try:
-            # Configuración directa de la base de datos MySQL
-            app.config['MYSQL_HOST'] = 'localhost'
-            app.config['MYSQL_USER'] = 'root'
-            app.config['MYSQL_PASSWORD'] = 'Cappa100..$$'
-            app.config['MYSQL_DB'] = 'sistema_ganadero2'
-            app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+            # Configuración de PostgreSQL
+            self.db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
             
             # Intentar establecer la conexión
-            self.connection = mysql.connector.connect(
-                host=app.config['MYSQL_HOST'],
-                user=app.config['MYSQL_USER'],
-                password=app.config['MYSQL_PASSWORD'],
-                database=app.config['MYSQL_DB']
-            )
+            self.connection = psycopg2.connect(self.db_url)
             
-            if not self.connection.is_connected():
+            if self.connection.closed:
                 raise Exception("No se pudo establecer la conexión con la base de datos")
             
-            logger.info("Conexión a la base de datos establecida exitosamente")
+            logger.info("Conexión a PostgreSQL establecida exitosamente")
             
-        except mysql.connector.Error as err:
-            logger.error(f"Error al conectar a la base de datos: {err}")
-            if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
-                raise Exception("Acceso denegado: verifique usuario y contraseña")
-            elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-                # Intentar crear la base de datos si no existe
-                try:
-                    temp_conn = mysql.connector.connect(
-                        host=app.config['MYSQL_HOST'],
-                        user=app.config['MYSQL_USER'],
-                        password=app.config['MYSQL_PASSWORD']
-                    )
-                    cursor = temp_conn.cursor()
-                    cursor.execute(f"CREATE DATABASE {app.config['MYSQL_DB']}")
-                    cursor.close()
-                    temp_conn.close()
-                    
-                    # Intentar conectar nuevamente
-                    self.connection = mysql.connector.connect(
-                        host=app.config['MYSQL_HOST'],
-                        user=app.config['MYSQL_USER'],
-                        password=app.config['MYSQL_PASSWORD'],
-                        database=app.config['MYSQL_DB']
-                    )
-                    logger.info("Base de datos creada y conexión establecida exitosamente")
-                except mysql.connector.Error as e:
-                    raise Exception(f"Error al crear la base de datos: {e}")
-            else:
-                raise Exception(f"Error de conexión: {err}")
+        except psycopg2.Error as err:
+            logger.error(f"Error al conectar a PostgreSQL: {err}")
+            raise Exception(f"Error de conexión a PostgreSQL: {err}")
         except Exception as e:
             logger.error(f"Error general al inicializar la base de datos: {e}")
             raise
@@ -76,15 +41,10 @@ class DatabaseConnection:
         Obtiene una conexión a la base de datos, reconectando si es necesario
         """
         try:
-            if not hasattr(self, 'connection') or not self.connection.is_connected():
-                self.connection = mysql.connector.connect(
-                    host='localhost',
-                    user='root',
-                    password='Cappa100..$$',
-                    database='sistema_ganadero2'
-                )
+            if not hasattr(self, 'connection') or self.connection.closed:
+                self.connection = psycopg2.connect(self.db_url)
             return self.connection
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al obtener conexión: {err}")
             raise Exception("No se pudo establecer la conexión con la base de datos")
 
@@ -100,7 +60,7 @@ class DatabaseConnection:
         try:
             connection = self.get_connection()
             
-            with connection.cursor(dictionary=True) as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Primero intentamos con la contraseña sin hash
                 cursor.execute("""
                     SELECT * FROM usuarios 
@@ -124,7 +84,7 @@ class DatabaseConnection:
                 logger.info(f"Inicio de sesión exitoso para el usuario: {username}")
                 return user
                 
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al validar usuario: {err}")
             raise Exception("Error al validar las credenciales del usuario")
     
@@ -142,7 +102,7 @@ class DatabaseConnection:
                 logger.info(f"Usuario {username} registrado exitosamente")
                 return cursor.lastrowid
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al registrar usuario: {err}")
             connection.rollback()
             raise
@@ -159,14 +119,14 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor() as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 query = "SELECT * FROM usuarios WHERE email = %s"
                 cursor.execute(query, (email,))
                 
                 result = cursor.fetchone()
                 return result is not None
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al verificar email existente: {err}")
             return False
 
@@ -182,14 +142,14 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor() as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 query = "SELECT * FROM usuarios WHERE username = %s"
                 cursor.execute(query, (username,))
                 
                 result = cursor.fetchone()
                 return result is not None
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al verificar username existente: {err}")
             return False
 
@@ -205,13 +165,13 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(dictionary=True) as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 query = "SELECT * FROM usuarios WHERE id = %s"
                 cursor.execute(query, (usuario_id,))
                 
                 return cursor.fetchone()
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al obtener usuario por ID: {err}")
             return None
 
@@ -235,7 +195,7 @@ class DatabaseConnection:
         try:
             # Primero verificamos si las columnas cargo y dirección existen
             connection = self.get_connection()
-            with connection.cursor(dictionary=True) as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Verificar si la columna cargo existe
                 cursor.execute("""
                     SELECT COUNT(*) as count
@@ -309,9 +269,9 @@ class DatabaseConnection:
                 logger.info(f"Perfil del usuario {usuario_id} actualizado correctamente")
                 return True
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al actualizar perfil de usuario: {err}")
-            if connection and connection.is_connected():
+            if connection and not connection.closed:
                 connection.rollback()
             return False
         except Exception as e:
@@ -346,7 +306,7 @@ class DatabaseConnection:
                 connection.commit()
                 return True
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al actualizar contraseña de usuario: {err}")
             return False
 
@@ -374,7 +334,7 @@ class DatabaseConnection:
                 result = cursor.fetchone()
                 return result is not None
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al verificar contraseña: {err}")
             return False
 
@@ -398,7 +358,7 @@ class DatabaseConnection:
                         fecha_registro
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
-                    )
+                    ) RETURNING id
                 """
                 
                 cursor.execute(query, (
@@ -415,12 +375,13 @@ class DatabaseConnection:
                     datos_animal.get('madre_arete', None)
                 ))
                 
+                result = cursor.fetchone()
                 connection.commit()
-                return cursor.lastrowid
+                return result[0] if result else None
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al registrar animal: {err}")
-            if connection and connection.is_connected():
+            if connection and not connection.closed:
                 connection.rollback()
             return None
 
@@ -437,7 +398,7 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(dictionary=True) as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Consulta simple que no usa JOIN (porque no hay relaciones por ID)
                 cursor.execute("SELECT * FROM animales WHERE id = %s", (animal_id,))
                 animal = cursor.fetchone()
@@ -460,29 +421,33 @@ class DatabaseConnection:
                 
                 return animal
                 
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al obtener animal por ID: {err}")
             return None
     def obtener_animales(self, usuario_id=None, filtros=None):
         """
-        Obtiene todos los animales registrados en el sistema.
+        Obtiene todos los animales registrados por un usuario específico.
         
         Args:
-            usuario_id: ID del usuario (opcional, ya no se usa)
+            usuario_id: ID del usuario
             filtros: Diccionario con filtros para la consulta (opcional)
             
         Returns:
-            Lista de animales
+            Lista de animales del usuario
         """
         try:
+            print(f"Obteniendo animales para usuario_id: {usuario_id}")
             connection = self.get_connection()
-            with connection.cursor(dictionary=True) as cursor:
-                # Consulta base sin filtro de usuario
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                # Consulta base con filtro de usuario
                 query = """
                     SELECT * FROM animales 
-                    WHERE 1=1
+                    WHERE usuario_id = %s
                 """
-                params = []
+                params = [usuario_id]
+                
+                print(f"Ejecutando query: {query}")
+                print(f"Parámetros: {params}")
                 
                 # Aplicar filtros adicionales si existen
                 if filtros:
@@ -501,9 +466,15 @@ class DatabaseConnection:
                 query += " ORDER BY fecha_registro DESC"
                 
                 cursor.execute(query, params)
-                return cursor.fetchall()
+                resultados = cursor.fetchall()
+                print(f"Resultados obtenidos: {len(resultados)}")
+                
+                if resultados:
+                    print(f"Primer resultado: {resultados[0]}")
+                
+                return resultados
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al obtener animales: {err}")
             return []
             
@@ -534,7 +505,7 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(dictionary=True) as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Intentar convertir a entero para búsqueda por ID
                 try:
                     animal_id = int(identificador)
@@ -555,7 +526,7 @@ class DatabaseConnection:
                 
                 return cursor.fetchall()
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al buscar animal por identificador: {err}")
             return []
 
@@ -591,9 +562,9 @@ class DatabaseConnection:
                 connection.commit()
                 return True
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al eliminar animal: {err}")
-            if connection and connection.is_connected():
+            if connection and not connection.closed:
                 connection.rollback()
             return False
     
@@ -609,7 +580,7 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(dictionary=True) as cursor:
+            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT g.*, a.nombre as nombre_vaca, a.numero_arete as arete_vaca,
                            t.nombre as nombre_toro, t.numero_arete as arete_toro
@@ -629,7 +600,7 @@ class DatabaseConnection:
                 
                 return gestaciones
         
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al obtener gestaciones: {err}")
             return []
 
@@ -685,76 +656,22 @@ class DatabaseConnection:
                 logger.info(f"Animal ID {animal_id} actualizado exitosamente")
                 return True
                 
-        except mysql.connector.Error as err:
+        except psycopg2.Error as err:
             logger.error(f"Error al actualizar animal: {err}")
-            if connection:
+            if connection and not connection.closed:
                 connection.rollback()
             return False
 
 
 def get_db_connection():
-    # Lista de credenciales a intentar para MySQL 8.0
-    credenciales = [
-        # Credenciales con puerto estándar 3306
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'Cappa100..$$'},  # Credencial principal confirmada
-        {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': 'Cappa100..$$'}, # Usando IP en lugar de localhost
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'root'},  # Credencial alternativa
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': ''},      # Usuario root sin contraseña
-        {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': 'root'}, # Usando IP con contraseña alternativa
-        {'host': '127.0.0.1', 'port': 3306, 'user': 'root', 'password': ''},     # IP con usuario sin contraseña
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'admin'}, # Usuario root con contraseña admin
-        
-        # Intentar con otros puertos comunes para MySQL
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': 'root'},  # Puerto alternativo
-        {'host': 'localhost', 'port': 3306, 'user': 'root', 'password': ''},      # Puerto alternativo sin contraseña
-    ]
-    
-    last_error = None
-    
-    # Intentar cada combinación de credenciales
-    for cred in credenciales:
-        try:
-            logger.info(f"Intentando conectar a {cred['host']}:{cred['port']} con usuario: {cred['user']} y contraseña: {'[vacía]' if cred['password'] == '' else '[presente]'}")
-            connection = mysql.connector.connect(
-                host=cred['host'],
-                port=cred['port'],
-                user=cred['user'],
-                password=cred['password'],
-                database='sistema_ganadero2'
-            )
-            logger.info(f"Conexión exitosa con {cred['host']}:{cred['port']} y usuario: {cred['user']}")
-            return connection
-        except mysql.connector.Error as err:
-            last_error = err
-            logger.warning(f"Intento fallido con {cred['host']}:{cred['port']} y usuario: {cred['user']} - Error: {err}")
-    
-    # Si llegamos aquí, ninguna credencial funcionó
-    logger.error(f"No se pudo conectar con ninguna credencial. Último error: {last_error}")
-    
-    # Intentar crear la base de datos si no existe
+    """
+    Obtiene una conexión a PostgreSQL usando la URL de conexión de Render
+    """
     try:
-        logger.info("Intentando conectar sin especificar base de datos para crearla si no existe")
-        connection = mysql.connector.connect(
-            host='localhost',
-            port=3306,
-            user='root',
-            password='Cappa100..$$',
-        )
-        cursor = connection.cursor()
-        cursor.execute("CREATE DATABASE IF NOT EXISTS sistema_ganadero2")
-        cursor.close()
-        connection.close()
-        
-        # Intentar conectar nuevamente con la base de datos recién creada
-        connection = mysql.connector.connect(
-            host='localhost',
-            port=3306,
-            user='root',
-            password='Cappa100..$$',
-            database='sistema_ganadero2'
-        )
-        logger.info("Base de datos creada y conexión establecida exitosamente")
+        db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
+        connection = psycopg2.connect(db_url)
+        logger.info("Conexión a PostgreSQL establecida exitosamente")
         return connection
-    except mysql.connector.Error as err:
-        logger.error(f"Error al intentar crear la base de datos: {err}")
-        raise last_error
+    except psycopg2.Error as err:
+        logger.error(f"Error al conectar a PostgreSQL: {err}")
+        raise Exception(f"Error de conexión a PostgreSQL: {err}")

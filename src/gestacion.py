@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 from src.database import get_db_connection
 from flask import flash
+import psycopg2.extras
 
 def registrar_gestacion(animal_id, fecha_monta, observaciones):
     try:
         # Validar que el animal existe y es hembra
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT id, sexo, condicion 
@@ -53,17 +54,26 @@ def registrar_gestacion(animal_id, fecha_monta, observaciones):
     except Exception as e:
         return False, f"Error al registrar la gestación: {str(e)}"
 
-def obtener_gestaciones():
+def obtener_gestaciones(usuario_id=None):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        cursor.execute("""
-            SELECT g.*, a.numero_arete, a.nombre, a.condicion
-            FROM gestaciones g
-            JOIN animales a ON g.animal_id = a.id
-            ORDER BY g.fecha_actualizacion DESC
-        """)
+        if usuario_id:
+            cursor.execute("""
+                SELECT g.*, a.numero_arete, a.nombre, a.condicion
+                FROM gestaciones g
+                JOIN animales a ON g.animal_id = a.id
+                WHERE a.usuario_id = %s
+                ORDER BY g.fecha_actualizacion DESC
+            """, (usuario_id,))
+        else:
+            cursor.execute("""
+                SELECT g.*, a.numero_arete, a.nombre, a.condicion
+                FROM gestaciones g
+                JOIN animales a ON g.animal_id = a.id
+                ORDER BY g.fecha_actualizacion DESC
+            """)
         
         gestaciones = cursor.fetchall()
         
@@ -83,7 +93,7 @@ def obtener_gestaciones():
                     cursor.execute("""
                         UPDATE gestaciones 
                         SET estado = 'Finalizado',
-                            observaciones = CONCAT(IFNULL(observaciones, ''), %s)
+                            observaciones = COALESCE(observaciones, '') || %s
                         WHERE id = %s AND estado = 'En Gestación'
                     """, (observacion, g['id']))
                     conn.commit()
@@ -104,16 +114,16 @@ def obtener_gestaciones():
 def obtener_gestaciones_proximas():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener gestaciones que están a 7 días o menos del parto y aún están activas
         cursor.execute("""
             SELECT g.*, a.numero_arete, a.nombre, a.condicion,
-                   DATEDIFF(g.fecha_probable_parto, CURDATE()) as dias_restantes
+                   (g.fecha_probable_parto - CURRENT_DATE) as dias_restantes
             FROM gestaciones g
             JOIN animales a ON g.animal_id = a.id
             WHERE g.estado = 'En Gestación'
-            AND DATEDIFF(g.fecha_probable_parto, CURDATE()) BETWEEN 0 AND 7
+            AND (g.fecha_probable_parto - CURRENT_DATE) BETWEEN 0 AND 7
             ORDER BY g.fecha_probable_parto ASC
         """)
         
@@ -134,7 +144,7 @@ def actualizar_estado_gestacion(gestacion_id, nuevo_estado, observaciones=None):
         
         update_query = """
             UPDATE gestaciones 
-            SET estado = %s, observaciones = CONCAT(IFNULL(observaciones, ''), '\n', %s)
+            SET estado = %s, observaciones = COALESCE(observaciones, '') || '\n' || %s
             WHERE id = %s
         """
         
@@ -165,7 +175,7 @@ def eliminar_gestacion(gestacion_id):
     """
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Verificar que la gestación existe
         cursor.execute("SELECT id FROM gestaciones WHERE id = %s", (gestacion_id,))

@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import logging
 from flask import session
 import os
+import psycopg2
+import psycopg2.extras
 
 # Configurar logger
 logger = logging.getLogger('alarmas')
@@ -47,7 +49,7 @@ class SistemaAlarmas:
             cursor.execute("""
                 SELECT COUNT(*) 
                 FROM information_schema.tables 
-                WHERE table_schema = 'sistema_ganadero2'
+                WHERE table_schema = 'public'
                 AND table_name = 'config_alarmas'
             """)
             
@@ -55,7 +57,7 @@ class SistemaAlarmas:
                 # Crear tabla si no existe
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS config_alarmas (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        id SERIAL PRIMARY KEY,
                         usuario_id INT NOT NULL,
                         tipo VARCHAR(50) NOT NULL,
                         dias_anticipacion INT DEFAULT 7,
@@ -199,7 +201,7 @@ class SistemaAlarmas:
                 logger.error("No se pudo conectar a la base de datos para obtener configuración de alarmas")
                 return {}
                 
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             # Obtener configuraciones de alarmas
             cursor.execute("""
@@ -243,7 +245,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             # Obtener configuraciones de alarmas de desparasitación activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'desparasitacion' AND activo = TRUE"
@@ -286,7 +288,7 @@ class SistemaAlarmas:
                     FROM desparasitaciones d
                     JOIN animales a ON d.animal_id = a.id
                     WHERE d.fecha_proxima <= %s
-                    AND d.fecha_proxima >= CURDATE()
+                    AND d.fecha_proxima >= CURRENT_DATE
                     AND d.usuario_id = %s
                 """
                 
@@ -382,7 +384,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             # Obtener configuraciones de alarmas de parto activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'parto' AND activo = TRUE"
@@ -422,13 +424,13 @@ class SistemaAlarmas:
                 
                 # Buscar animales con partos próximos
                 query = """
-                    SELECT a.*, r.fecha_parto_estimada, DATEDIFF(r.fecha_parto_estimada, CURDATE()) as dias_restantes
+                    SELECT a.*, r.fecha_parto_estimada, (r.fecha_parto_estimada - CURRENT_DATE) as dias_restantes
                     FROM animales a
                     JOIN reproduccion r ON a.id = r.animal_id
                     WHERE a.sexo = 'Hembra' 
                     AND r.fecha_parto_estimada IS NOT NULL
                     AND r.fecha_parto_estimada <= %s
-                    AND r.fecha_parto_estimada >= CURDATE()
+                    AND r.fecha_parto_estimada >= CURRENT_DATE
                 """
                 
                 print(f"Ejecutando consulta: {query}")
@@ -523,7 +525,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             # Obtener configuraciones de alarmas de vacunación activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'vacunacion' AND activo = TRUE"
@@ -569,7 +571,7 @@ class SistemaAlarmas:
                     JOIN animales a ON rv.animal_id = a.id
                     JOIN vacunas v ON rv.vacuna_id = v.id
                     WHERE rv.fecha_proxima <= %s
-                    AND rv.fecha_proxima >= CURDATE()
+                    AND rv.fecha_proxima >= CURRENT_DATE
                     AND rv.usuario_id = %s
                 """
                 
@@ -661,7 +663,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             # Obtener configuraciones de alarmas de vitaminización activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'vitaminizacion' AND activo = TRUE"
@@ -705,7 +707,7 @@ class SistemaAlarmas:
                     FROM vitaminizaciones v
                     JOIN animales a ON v.animal_id = a.id
                     WHERE v.fecha_proxima <= %s
-                    AND v.fecha_proxima >= CURDATE()
+                    AND v.fecha_proxima >= CURRENT_DATE
                     AND v.usuario_id = %s
                 """
                 

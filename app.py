@@ -31,6 +31,7 @@ from src.gestacion import registrar_gestacion, obtener_gestaciones, actualizar_e
 from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
+import psycopg2.extras
 
 # Configuración para Vercel (sin carpetas locales)
 # UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
@@ -51,6 +52,13 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 # Función para validar archivos de imagen de perfil
 def allowed_file_perfil(filename):
     """Verifica si el archivo tiene una extensión permitida para perfiles"""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Función para validar archivos de imagen general
+def allowed_file(filename):
+    """Verifica si el archivo tiene una extensión permitida para imágenes"""
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -216,46 +224,72 @@ def login_required(f):
 def dashboard():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Obtener estadísticas generales
-        cursor.execute("SELECT COUNT(*) as total FROM animales")
+        usuario_id = session.get('usuario_id')
+        print(f"Dashboard - Usuario ID: {usuario_id}")
+        
+        # Obtener estadísticas generales filtradas por usuario
+        cursor.execute("SELECT COUNT(*) as total FROM animales WHERE usuario_id = %s", (usuario_id,))
         total_animales = cursor.fetchone()['total']
         
-        cursor.execute("SELECT COUNT(*) as total FROM gestaciones WHERE estado = 'En Gestación'")
+        cursor.execute("""
+            SELECT COUNT(*) as total 
+            FROM gestaciones g
+            JOIN animales a ON g.animal_id = a.id
+            WHERE g.estado = 'En Gestación' AND a.usuario_id = %s
+        """, (usuario_id,))
         total_gestaciones = cursor.fetchone()['total']
         
-        cursor.execute("SELECT SUM(total_dia) as total FROM registro_leche")
+        cursor.execute("""
+            SELECT SUM(rl.total_dia) as total 
+            FROM registro_leche rl
+            JOIN animales a ON rl.animal_id = a.id
+            WHERE a.usuario_id = %s
+        """, (usuario_id,))
         total_leche = cursor.fetchone()['total'] or 0
         
-        # Contar vacunaciones pendientes de todas las tablas
+        # Contar vacunaciones pendientes de todas las tablas filtradas por usuario
         # 1. Carbunco
         cursor.execute("""
             SELECT COUNT(DISTINCT c.id) as total 
-            FROM carbunco c 
-            WHERE c.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        """)
+            FROM carbunco c
+            JOIN animales a ON c.animal_id = a.id
+            WHERE c.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+            AND a.usuario_id = %s
+        """, (usuario_id,))
         total_carbunco = cursor.fetchone()['total']
         
         # 2. Vitaminización
         cursor.execute("""
             SELECT COUNT(DISTINCT v.id) as total 
-            FROM vitaminizaciones v 
-            WHERE v.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        """)
+            FROM vitaminizaciones v
+            JOIN animales a ON v.animal_id = a.id
+            WHERE v.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+            AND a.usuario_id = %s
+        """, (usuario_id,))
         total_vitaminizacion = cursor.fetchone()['total']
         
         # 3. Desparasitación
         cursor.execute("""
             SELECT COUNT(DISTINCT d.id) as total 
-            FROM desparasitaciones d 
-            WHERE d.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        """)
+            FROM desparasitaciones d
+            JOIN animales a ON d.animal_id = a.id
+            WHERE d.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+            AND a.usuario_id = %s
+        """, (usuario_id,))
         total_desparasitacion = cursor.fetchone()['total']
         
         # 4. Vacunas tradicionales (si existen)
         try:
-            cursor.execute("SELECT COUNT(*) as total FROM vacuna WHERE estado = 'Activo' AND fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)")
+            cursor.execute("""
+                SELECT COUNT(*) as total 
+                FROM vacuna v
+                JOIN animales a ON v.animal_id = a.id
+                WHERE v.estado = 'Activo' 
+                AND v.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+                AND a.usuario_id = %s
+            """, (usuario_id,))
             total_vacunas = cursor.fetchone()['total']
         except Exception as e:
             app.logger.error(f"Error al contar vacunas tradicionales: {str(e)}")
@@ -265,25 +299,25 @@ def dashboard():
         total_vacunaciones_pendientes = total_carbunco + total_vitaminizacion + total_desparasitacion + total_vacunas
         
         # Registrar en el log para depuración
-        app.logger.info(f"Vacunaciones pendientes - Carbunco: {total_carbunco}, Vitaminización: {total_vitaminizacion}, Desparasitación: {total_desparasitacion}, Vacunas: {total_vacunas}, Total: {total_vacunaciones_pendientes}")
+        app.logger.info(f"Usuario {usuario_id} - Vacunaciones pendientes - Carbunco: {total_carbunco}, Vitaminización: {total_vitaminizacion}, Desparasitación: {total_desparasitacion}, Vacunas: {total_vacunas}, Total: {total_vacunaciones_pendientes}")
         
+        # Obtener actividades recientes del usuario
+        actividades = auditoria.obtener_actividad_reciente(limite=5, usuario_id=usuario_id)
         
-        # Obtener actividades recientes
-        actividades = auditoria.obtener_actividad_reciente(limite=5)
-        
-        # Obtener próximos partos (próximos 30 días)
+        # Obtener próximos partos (próximos 30 días) filtrados por usuario
         cursor.execute("""
             SELECT g.*, a.nombre as nombre_animal, a.numero_arete
             FROM gestaciones g
             JOIN animales a ON g.animal_id = a.id
-            WHERE g.fecha_probable_parto BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            WHERE g.fecha_probable_parto BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
             AND g.estado = 'En Gestación'
+            AND a.usuario_id = %s
             ORDER BY g.fecha_probable_parto ASC
             LIMIT 5
-        """)
+        """, (usuario_id,))
         proximos_partos = cursor.fetchall()
         
-        # Obtener próximas vacunaciones (próximos 30 días) de todas las tablas
+        # Obtener próximas vacunaciones (próximos 30 días) de todas las tablas filtradas por usuario
         # 1. Carbunco
         cursor.execute("""
             SELECT 
@@ -297,8 +331,9 @@ def dashboard():
                 a.id as animal_id
             FROM carbunco c
             JOIN animales a ON c.animal_id = a.id
-            WHERE c.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        """)
+            WHERE c.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+            AND a.usuario_id = %s
+        """, (usuario_id,))
         proximas_carbunco = cursor.fetchall()
         
         # 2. Vitaminización
@@ -314,8 +349,9 @@ def dashboard():
                 a.id as animal_id
             FROM vitaminizaciones v
             JOIN animales a ON v.animal_id = a.id
-            WHERE v.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        """)
+            WHERE v.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+            AND a.usuario_id = %s
+        """, (usuario_id,))
         proximas_vitaminizacion = cursor.fetchall()
         
         # 3. Desparasitación
@@ -331,8 +367,9 @@ def dashboard():
                 a.id as animal_id
             FROM desparasitaciones d
             JOIN animales a ON d.animal_id = a.id
-            WHERE d.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        """)
+            WHERE d.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+            AND a.usuario_id = %s
+        """, (usuario_id,))
         proximas_desparasitacion = cursor.fetchall()
         
         # 4. Vacunas tradicionales (si existen)
@@ -342,10 +379,11 @@ def dashboard():
                        v.fecha_proxima as fecha_programada
                 FROM vacuna v
                 JOIN animales a ON v.animal_id = a.id
-                WHERE v.fecha_proxima BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+                WHERE v.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
                 AND v.estado = 'Activo'
+                AND a.usuario_id = %s
                 ORDER BY v.fecha_proxima ASC
-            """)
+            """, (usuario_id,))
             proximas_vacunas = cursor.fetchall()
         except Exception as e:
             app.logger.error(f"Error al consultar tabla vacuna: {str(e)}")
@@ -360,8 +398,23 @@ def dashboard():
         # Limitar a 5 resultados
         proximas_vacunaciones = proximas_vacunaciones[:5]
         
+        # Obtener gestaciones próximas para alertas
+        cursor.execute("""
+            SELECT g.*, a.nombre as nombre_animal, a.numero_arete,
+                   (g.fecha_probable_parto - CURRENT_DATE) as dias_restantes
+            FROM gestaciones g
+            JOIN animales a ON g.animal_id = a.id
+            WHERE g.fecha_probable_parto BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+            AND g.estado = 'En Gestación'
+            AND a.usuario_id = %s
+            ORDER BY g.fecha_probable_parto ASC
+        """, (usuario_id,))
+        gestaciones_proximas = cursor.fetchall()
+        
         cursor.close()
         conn.close()
+        
+        print(f"Dashboard - Total animales: {total_animales}, Gestaciones: {total_gestaciones}, Leche: {total_leche}")
         
         return render_template('dashboard.html', 
                                total_animales=total_animales,
@@ -371,9 +424,11 @@ def dashboard():
                                actividades=actividades,
                                proximos_partos=proximos_partos,
                                proximas_vacunaciones=proximas_vacunaciones,
+                               gestaciones_proximas=gestaciones_proximas,
                                now=datetime.now(),
                                timedelta=timedelta)
     except Exception as e:
+        app.logger.error(f"Error en dashboard: {str(e)}")
         flash(f'Error al cargar el dashboard: {str(e)}', 'error')
         return render_template('dashboard.html')
 
@@ -565,11 +620,178 @@ def recuperar_contrasena():
 @app.route('/animales')
 @login_required
 def animales():
-    return render_template('animales.html')
+    try:
+        # Obtener todos los animales del usuario actual
+        usuario_id = session.get('usuario_id')
+        print(f"Usuario ID en sesión: {usuario_id}")
+        
+        # Verificar si db_connection está inicializado
+        global db_connection
+        if db_connection is None:
+            print("db_connection es None, inicializando...")
+            db_connection = DatabaseConnection(app)
+        
+        # Verificar si la tabla animales existe y tiene datos
+        try:
+            connection = db_connection.get_connection()
+            with connection.cursor() as cursor:
+                # Verificar si la tabla existe
+                cursor.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_name = 'animales'
+                """)
+                result = cursor.fetchone()
+                tabla_existe = result['count'] > 0 if result else False
+                print(f"Tabla animales existe: {tabla_existe}")
+                
+                if tabla_existe:
+                    # Verificar cuántos animales hay en total
+                    cursor.execute("SELECT COUNT(*) FROM animales")
+                    result = cursor.fetchone()
+                    total_animales = result['count'] if result else 0
+                    print(f"Total de animales en la tabla: {total_animales}")
+                    
+                    # Verificar cuántos animales tiene este usuario
+                    cursor.execute("SELECT COUNT(*) FROM animales WHERE usuario_id = %s", (usuario_id,))
+                    result = cursor.fetchone()
+                    animales_usuario = result['count'] if result else 0
+                    print(f"Animales del usuario {usuario_id}: {animales_usuario}")
+        except Exception as e:
+            print(f"Error al verificar tabla: {str(e)}")
+        
+        animales = db_connection.obtener_animales(usuario_id)
+        print(f"Animales obtenidos para usuario {usuario_id}: {len(animales) if animales else 0}")
+        
+        if animales:
+            print(f"Primer animal: {animales[0]}")
+        
+        # Importar datetime para calcular la edad
+        from datetime import datetime
+        now = datetime.now().date()
+        
+        # Si no hay animales, crear algunos de prueba
+        if not animales and usuario_id:
+            print("No hay animales, creando algunos de prueba...")
+            try:
+                connection = db_connection.get_connection()
+                with connection.cursor() as cursor:
+                    # Insertar animales de prueba
+                    animales_prueba = [
+                        ('Vaca001', 'Lola', 'Hembra', 'Holstein', 'Vaca', '2020-03-15', 'Juan Pérez', None, None, usuario_id),
+                        ('Toro001', 'Max', 'Macho', 'Angus', 'Toro', '2019-05-20', 'Juan Pérez', None, None, usuario_id),
+                        ('Ternero001', 'Peque', 'Macho', 'Holstein', 'Ternero', '2024-12-01', 'Juan Pérez', 'Toro001', 'Vaca001', usuario_id)
+                    ]
+                    
+                    for arete, nombre, sexo, raza, condicion, fecha_nac, propietario, padre, madre, user_id in animales_prueba:
+                        cursor.execute("""
+                            INSERT INTO animales (numero_arete, nombre, sexo, raza, condicion, fecha_nacimiento, propietario, padre_arete, madre_arete, usuario_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (arete, nombre, sexo, raza, condicion, fecha_nac, propietario, padre, madre, user_id))
+                    
+                    connection.commit()
+                    print("Animales de prueba creados exitosamente")
+                    
+                    # Obtener los animales nuevamente
+                    animales = db_connection.obtener_animales(usuario_id)
+                    print(f"Animales después de crear prueba: {len(animales) if animales else 0}")
+                    
+            except Exception as e:
+                print(f"Error al crear animales de prueba: {str(e)}")
+        
+        return render_template('animales.html', animales=animales, now=now)
+    except Exception as e:
+        print(f"Error al obtener animales: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('Error al cargar los animales', 'error')
+        from datetime import datetime
+        return render_template('animales.html', animales=[], now=datetime.now().date())
 
 @app.route('/registrar-animal', methods=['GET', 'POST'])
 @login_required
 def registrar_animal():
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            nombre = request.form.get('nombre')
+            numero_arete = request.form.get('numero_arete')
+            raza = request.form.get('raza')
+            sexo = request.form.get('sexo')
+            condicion = request.form.get('condicion')
+            fecha_nacimiento = request.form.get('fecha_nacimiento')
+            propietario = request.form.get('propietario', '')
+            padre_arete = request.form.get('padre_arete', '')
+            madre_arete = request.form.get('madre_arete', '')
+            
+            # Validaciones básicas
+            if not nombre or len(nombre) < 2:
+                flash('El nombre debe tener al menos 2 caracteres', 'error')
+                return render_template('registrar_animal.html')
+            
+            if not numero_arete:
+                flash('El número de arete es obligatorio', 'error')
+                return render_template('registrar_animal.html')
+            
+            if not raza:
+                flash('La raza es obligatoria', 'error')
+                return render_template('registrar_animal.html')
+            
+            if not sexo:
+                flash('El sexo es obligatorio', 'error')
+                return render_template('registrar_animal.html')
+            
+            # Manejar carga de imagen
+            foto_path = None
+            foto = request.files.get('foto')
+            if foto and foto.filename:
+                if allowed_file(foto.filename):
+                    # Subir imagen a Cloudinary
+                    from src.cloudinary_handler import upload_file
+                    cloudinary_url = upload_file(foto, folder="animales")
+                    if cloudinary_url:
+                        foto_path = cloudinary_url
+                    else:
+                        flash('Error al subir la imagen', 'error')
+                        return render_template('registrar_animal.html')
+                else:
+                    flash('Formato de imagen no permitido. Use JPG, PNG o GIF', 'error')
+                    return render_template('registrar_animal.html')
+            
+            # Preparar datos del animal
+            datos_animal = {
+                'usuario_id': session.get('usuario_id'),
+                'nombre': nombre,
+                'numero_arete': numero_arete,
+                'raza': raza,
+                'sexo': sexo,
+                'condicion': condicion or 'Normal',
+                'fecha_nacimiento': fecha_nacimiento,
+                'propietario': propietario,
+                'foto_path': foto_path,
+                'padre_arete': padre_arete if padre_arete else None,
+                'madre_arete': madre_arete if madre_arete else None
+            }
+            
+            # Registrar el animal en la base de datos
+            print(f"Intentando registrar animal con datos: {datos_animal}")
+            animal_id = db_connection.registrar_animal(datos_animal)
+            print(f"Resultado del registro: {animal_id}")
+            
+            if animal_id:
+                # Registrar la actividad en el sistema de auditoría
+                auditoria.registrar_actividad(
+                    accion='Registrar', 
+                    modulo='Animales', 
+                    descripcion=f'Se registró el animal: {nombre} (ID: {animal_id})'
+                )
+                flash('Animal registrado exitosamente', 'success')
+                return redirect(url_for('animales'))
+            else:
+                flash('Error al registrar el animal en la base de datos', 'error')
+                
+        except Exception as e:
+            flash(f'Error al registrar el animal: {str(e)}', 'error')
+    
     return render_template('registrar_animal.html')
 
 @app.route('/editar-animal/<int:animal_id>', methods=['GET', 'POST'])
@@ -962,24 +1184,84 @@ Fecha de Nacimiento: {animal.get('fecha_nacimiento', 'N/A') if isinstance(animal
 @app.route('/gestacion')
 @login_required
 def gestacion():
-    # Obtener solo animales hembra (vacas y vaconas)
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT id, nombre, numero_arete, condicion 
-        FROM animales 
-        WHERE sexo = 'Hembra' 
-        AND condicion IN ('Vaca', 'Vacona')
-        ORDER BY nombre
-    """)
-    animales = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
-    # Obtener todas las gestaciones
-    gestaciones = obtener_gestaciones()
-    
-    return render_template('gestacion.html', animales=animales, gestaciones=gestaciones)
+    try:
+        # Obtener solo animales hembra (vacas y vaconas) del usuario actual
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Verificar si hay animales para este usuario
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM animales 
+            WHERE usuario_id = %s AND sexo = 'Hembra' 
+            AND condicion IN ('Vaca', 'Vacona')
+        """, (session['usuario_id'],))
+        result = cursor.fetchone()
+        count = result['count'] if result else 0
+        print(f"Animales hembra para gestación del usuario {session['usuario_id']}: {count}")
+        
+        # Obtener animales hembra del usuario actual
+        cursor.execute("""
+            SELECT id, nombre, numero_arete, condicion 
+            FROM animales 
+            WHERE usuario_id = %s AND sexo = 'Hembra' 
+            AND condicion IN ('Vaca', 'Vacona')
+            ORDER BY nombre
+        """, (session['usuario_id'],))
+        animales = cursor.fetchall()
+        
+        print(f"Animales obtenidos para gestación: {len(animales)}")
+        if animales:
+            print(f"Primer animal: {animales[0]}")
+        
+        # Si no hay animales hembra, crear algunos de prueba
+        if not animales and session['usuario_id']:
+            print("No hay animales hembra, creando algunos de prueba...")
+            try:
+                # Crear algunas vacas de prueba
+                animales_prueba = [
+                    ('Vaca001', 'Lola', 'Hembra', 'Vaca', 'Holstein', session['usuario_id']),
+                    ('Vaca002', 'Rosita', 'Hembra', 'Vaca', 'Angus', session['usuario_id']),
+                    ('Vacona001', 'Estrella', 'Hembra', 'Vacona', 'Holstein', session['usuario_id'])
+                ]
+                
+                for arete, nombre, sexo, condicion, raza, user_id in animales_prueba:
+                    cursor.execute("""
+                        INSERT INTO animales (numero_arete, nombre, sexo, condicion, raza, usuario_id)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (arete, nombre, sexo, condicion, raza, user_id))
+                
+                conn.commit()
+                print("Animales hembra de prueba creados exitosamente")
+                
+                # Obtener los animales nuevamente
+                cursor.execute("""
+                    SELECT id, nombre, numero_arete, condicion 
+                    FROM animales 
+                    WHERE usuario_id = %s AND sexo = 'Hembra' 
+                    AND condicion IN ('Vaca', 'Vacona')
+                    ORDER BY nombre
+                """, (session['usuario_id'],))
+                animales = cursor.fetchall()
+                print(f"Animales después de crear prueba: {len(animales)}")
+                
+            except Exception as e:
+                print(f"Error al crear animales de prueba: {str(e)}")
+        
+        # Obtener todas las gestaciones del usuario actual
+        gestaciones = obtener_gestaciones(session['usuario_id'])
+        
+        cursor.close()
+        conn.close()
+        
+        return render_template('gestacion.html', animales=animales, gestaciones=gestaciones)
+        
+    except Exception as e:
+        print(f"Error en gestación: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('Error al cargar la página de gestación', 'error')
+        return render_template('gestacion.html', animales=[], gestaciones=[])
 
 @app.route('/registrar_gestacion', methods=['POST'])
 @login_required
@@ -1085,7 +1367,7 @@ def vacunas():
 def desparasitacion():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener todos los animales
         cursor.execute("""
@@ -1104,8 +1386,8 @@ def desparasitacion():
             SELECT d.*, 
                    a.nombre as nombre_animal,
                    a.numero_arete as arete_animal,
-                   DATE_FORMAT(d.fecha_aplicacion, '%d/%m/%Y') as fecha_aplicacion_formato,
-                   DATE_FORMAT(d.fecha_proxima, '%d/%m/%Y') as fecha_proxima_formato
+                   TO_CHAR(d.fecha_aplicacion, 'DD/MM/YYYY') as fecha_aplicacion_formato,
+                   TO_CHAR(d.fecha_proxima, 'DD/MM/YYYY') as fecha_proxima_formato
             FROM desparasitaciones d
             JOIN animales a ON d.animal_id = a.id
             WHERE d.usuario_id = %s
@@ -1170,15 +1452,15 @@ def registrar_desparasitacion():
 def detalles_desparasitacion(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener detalles del registro
         cursor.execute("""
             SELECT d.*, 
                    a.nombre as nombre_animal,
                    a.numero_arete as arete_animal,
-                   DATE_FORMAT(d.fecha_aplicacion, '%d/%m/%Y') as fecha_aplicacion_formato,
-                   DATE_FORMAT(d.fecha_proxima, '%d/%m/%Y') as proxima_aplicacion_formato
+                   TO_CHAR(d.fecha_aplicacion, 'DD/MM/YYYY') as fecha_aplicacion_formato,
+                   TO_CHAR(d.fecha_proxima, 'DD/MM/YYYY') as proxima_aplicacion_formato
             FROM desparasitaciones d
             JOIN animales a ON d.animal_id = a.id
             WHERE d.id = %s AND d.usuario_id = %s
@@ -1234,7 +1516,7 @@ def menu_desparasitacion():
 def obtener_cantones(provincia_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Verificar si la provincia existe
         cursor.execute("SELECT id FROM provincias WHERE id = %s", (provincia_id,))
@@ -1268,7 +1550,7 @@ def obtener_cantones(provincia_id):
 def obtener_parroquias(canton_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Verificar si el cantón existe
         cursor.execute("SELECT id FROM cantones WHERE id = %s", (canton_id,))
@@ -1327,7 +1609,7 @@ def registrar_fiebre_aftosa():
         app.logger.info(f'Próxima aplicación calculada: {proxima_aplicacion}')
 
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         try:
             # Insertar registro de fiebre aftosa
@@ -1404,7 +1686,7 @@ def registrar_fiebre_aftosa():
 def detalles_fiebre_aftosa(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener detalles de la vacunación
         cursor.execute("""
@@ -1447,7 +1729,7 @@ def detalles_fiebre_aftosa(id):
 @login_required
 def pastizales():
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Obtener todos los pastizales del usuario
@@ -1504,7 +1786,7 @@ def registrar_pastizal():
 @login_required
 def obtener_animales_disponibles(pastizal_id):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Obtener información del pastizal
@@ -1627,14 +1909,14 @@ def asignar_animales(pastizal_id):
 def inseminaciones():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Obtener todas las inseminaciones con detalles del animal
+        # Obtener todas las inseminaciones del usuario actual con detalles del animal
         cursor.execute("""
             SELECT 
                 i.id, 
                 i.animal_id, 
-                DATE_FORMAT(i.fecha_inseminacion, '%d/%m/%Y') as fecha_inseminacion, 
+                TO_CHAR(i.fecha_inseminacion, 'DD/MM/YYYY') as fecha_inseminacion, 
                 i.tipo_inseminacion, 
                 COALESCE(i.semental, '') as semental, 
                 COALESCE(i.raza_semental, '') as raza_semental, 
@@ -1647,8 +1929,9 @@ def inseminaciones():
                 COALESCE(a.condicion, '') as condicion_animal
             FROM inseminaciones i 
             LEFT JOIN animales a ON i.animal_id = a.id 
+            WHERE a.usuario_id = %s
             ORDER BY i.fecha_inseminacion DESC
-        """)
+        """, (session['usuario_id'],))
         
         # Debug: Imprimir los campos de cada registro para verificar
         print("\n==== DATOS DE INSEMINACIONES RECUPERADOS ====")
@@ -1674,14 +1957,14 @@ def inseminaciones():
             print("No hay registros de inseminaciones")
         print("==== FIN DE REGISTROS ====\n\n")
         
-        # Obtener animales hembras disponibles para inseminación
+        # Obtener animales hembras del usuario actual disponibles para inseminación
         cursor.execute("""
             SELECT id, nombre, numero_arete, condicion
             FROM animales 
-            WHERE sexo = 'Hembra'
+            WHERE usuario_id = %s AND sexo = 'Hembra'
             AND condicion IN ('Vaca', 'Vacona')
             ORDER BY nombre
-        """)
+        """, (session['usuario_id'],))
         animales = cursor.fetchall()
         
         return render_template('inseminaciones.html', 
@@ -1833,21 +2116,27 @@ def editar_inseminacion(id):
 def genealogia():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Obtener registros genealógicos con nombres de animales
+        # Obtener registros genealógicos del usuario actual con nombres de animales
         cursor.execute("""
             SELECT g.*, 
                    a.nombre as nombre_animal,
                    a.numero_arete as animal_arete
             FROM genealogia g
             JOIN animales a ON g.animal_id = a.id
+            WHERE a.usuario_id = %s
             ORDER BY a.nombre
-        """)
+        """, (session['usuario_id'],))
         genealogia = cursor.fetchall()
         
-        # Obtener lista de animales para los selectores
-        cursor.execute("SELECT id, nombre, numero_arete FROM animales ORDER BY nombre")
+        # Obtener lista de animales del usuario actual para los selectores
+        cursor.execute("""
+            SELECT id, nombre, numero_arete 
+            FROM animales 
+            WHERE usuario_id = %s 
+            ORDER BY nombre
+        """, (session['usuario_id'],))
         animales = cursor.fetchall()
         
         return render_template('genealogia.html', 
@@ -1902,7 +2191,7 @@ def agregar_genealogia():
 def obtener_genealogia(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT g.*, 
@@ -2008,11 +2297,11 @@ def registro_leche_redirect():
 def obtener_registro_leche(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT p.*, a.nombre as nombre_animal,
-                   DATE_FORMAT(p.fecha, '%Y-%m-%d') as fecha_formato
+                   TO_CHAR(p.fecha, 'YYYY-MM-DD') as fecha_formato
             FROM produccion_leche p
             JOIN animales a ON p.animal_id = a.id
             WHERE p.id = %s
@@ -2047,10 +2336,10 @@ def editar_registro_leche(id):
         if not fecha:
             raise ValueError('La fecha es requerida')
             
-        # Convertir la fecha al formato correcto para MySQL
+        # Convertir la fecha al formato correcto para PostgreSQL
         try:
             fecha_obj = datetime.strptime(fecha, '%Y-%m-%d')
-            fecha_mysql = fecha_obj.strftime('%Y-%m-%d')
+            fecha_postgres = fecha_obj.strftime('%Y-%m-%d')
         except ValueError as e:
             raise ValueError('Formato de fecha inválido. Use YYYY-MM-DD')
         
@@ -2066,7 +2355,7 @@ def editar_registro_leche(id):
                 calidad = %s,
                 observaciones = %s
             WHERE id = %s
-        """, (animal_id, fecha_mysql, cantidad_manana,
+        """, (animal_id, fecha_postgres, cantidad_manana,
               calidad, observaciones, id))
         
         db.commit()
@@ -2088,7 +2377,7 @@ def editar_registro_leche(id):
 def ventas_leche():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -2121,7 +2410,7 @@ def ventas_leche():
                 SUM(cantidad_litros) as total_litros,
                 SUM(total) as total_ingresos
             FROM ventas_leche 
-            WHERE DATE(fecha) = CURDATE()
+            WHERE DATE(fecha) = CURRENT_DATE
         """)
         totales_hoy = cursor.fetchone()
         
@@ -2131,8 +2420,8 @@ def ventas_leche():
                 SUM(cantidad_litros) as total_litros,
                 SUM(total) as total_ingresos
             FROM ventas_leche 
-            WHERE YEAR(fecha) = YEAR(CURDATE()) 
-            AND MONTH(fecha) = MONTH(CURDATE())
+            WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE) 
+            AND EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM CURRENT_DATE)
         """)
         totales_mes = cursor.fetchone()
         
@@ -2241,7 +2530,7 @@ def editar_venta_leche(id):
         else:
             # Obtener datos de la venta para el formulario
             db = get_db_connection()
-            cursor = db.cursor(dictionary=True)
+            cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cursor.execute("SELECT * FROM ventas_leche WHERE id = %s", (id,))
             venta = cursor.fetchone()
             cursor.close()
@@ -2266,7 +2555,7 @@ def editar_venta_leche(id):
 def ingresos():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -2302,7 +2591,7 @@ def ingresos():
         cursor.execute("""
             SELECT SUM(monto) as total
             FROM ingresos 
-            WHERE DATE(fecha) = CURDATE()
+            WHERE DATE(fecha) = CURRENT_DATE
         """)
         total_hoy = cursor.fetchone()['total'] or 0
         
@@ -2310,8 +2599,8 @@ def ingresos():
         cursor.execute("""
             SELECT SUM(monto) as total
             FROM ingresos 
-            WHERE YEAR(fecha) = YEAR(CURDATE()) 
-            AND MONTH(fecha) = MONTH(CURDATE())
+            WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE) 
+            AND EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM CURRENT_DATE)
         """)
         total_mes = cursor.fetchone()['total'] or 0
         
@@ -2319,7 +2608,7 @@ def ingresos():
         cursor.execute("""
             SELECT SUM(monto) as total
             FROM ingresos 
-            WHERE YEAR(fecha) = YEAR(CURDATE())
+            WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE)
         """)
         total_anio = cursor.fetchone()['total'] or 0
         
@@ -2386,7 +2675,7 @@ def agregar_ingreso():
 def eliminar_ingreso(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Primero obtenemos la información del ingreso para eliminar el comprobante si existe
         cursor.execute("SELECT comprobante FROM ingresos WHERE id = %s", (id,))
@@ -2422,7 +2711,7 @@ def eliminar_ingreso(id):
 def obtener_ingreso(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT i.*, c.nombre as categoria_nombre 
@@ -2458,7 +2747,7 @@ def actualizar_ingreso(id):
         descripcion = request.form.get('descripcion', '')
         
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Verificar si el ingreso existe
         cursor.execute("SELECT * FROM ingresos WHERE id = %s", (id,))
@@ -2516,7 +2805,7 @@ def actualizar_ingreso(id):
 def gastos():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -2552,7 +2841,7 @@ def gastos():
         cursor.execute("""
             SELECT SUM(monto) as total
             FROM gastos 
-            WHERE DATE(fecha) = CURDATE()
+            WHERE DATE(fecha) = CURRENT_DATE
         """)
         total_hoy = cursor.fetchone()['total'] or 0
         
@@ -2560,8 +2849,8 @@ def gastos():
         cursor.execute("""
             SELECT SUM(monto) as total
             FROM gastos 
-            WHERE YEAR(fecha) = YEAR(CURDATE()) 
-            AND MONTH(fecha) = MONTH(CURDATE())
+            WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE) 
+            AND EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM CURRENT_DATE)
         """)
         total_mes = cursor.fetchone()['total'] or 0
         
@@ -2569,7 +2858,7 @@ def gastos():
         cursor.execute("""
             SELECT SUM(monto) as total
             FROM gastos 
-            WHERE YEAR(fecha) = YEAR(CURDATE())
+            WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE)
         """)
         total_anio = cursor.fetchone()['total'] or 0
         
@@ -2636,7 +2925,7 @@ def agregar_gasto():
 def eliminar_gasto(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Primero obtenemos la información del gasto para eliminar el comprobante si existe
         cursor.execute("SELECT comprobante FROM gastos WHERE id = %s", (id,))
@@ -2672,7 +2961,7 @@ def eliminar_gasto(id):
 def obtener_gasto(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener los datos del gasto
         cursor.execute("""
@@ -2709,7 +2998,7 @@ def actualizar_gasto(id):
         descripcion = request.form.get('descripcion', '')
         
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Primero obtenemos la información actual del gasto
         cursor.execute("SELECT comprobante FROM gastos WHERE id = %s", (id,))
@@ -2765,7 +3054,7 @@ def actualizar_gasto(id):
 def reportes_financieros():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener el año y mes actual
         fecha_actual = datetime.now()
@@ -2796,8 +3085,8 @@ def reportes_financieros():
                 COALESCE(SUM(i.monto), 0) as total
             FROM categorias_ingreso c
             LEFT JOIN ingresos i ON c.id = i.categoria_id 
-                AND YEAR(i.fecha) = %s 
-                AND MONTH(i.fecha) = %s
+                AND EXTRACT(YEAR FROM i.fecha) = %s 
+                AND EXTRACT(MONTH FROM i.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
         """, (año_actual, mes_actual))
@@ -2810,8 +3099,8 @@ def reportes_financieros():
                 COALESCE(SUM(g.monto), 0) as total
             FROM categorias_gasto c
             LEFT JOIN gastos g ON c.id = g.categoria_id 
-                AND YEAR(g.fecha) = %s 
-                AND MONTH(g.fecha) = %s
+                AND EXTRACT(YEAR FROM g.fecha) = %s 
+                AND EXTRACT(MONTH FROM g.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
         """, (año_actual, mes_actual))
@@ -2821,14 +3110,14 @@ def reportes_financieros():
         cursor.execute("""
             SELECT COALESCE(SUM(monto), 0) as total
             FROM ingresos 
-            WHERE YEAR(fecha) = %s
+            WHERE EXTRACT(YEAR FROM fecha) = %s
         """, (año_actual,))
         total_ingresos_anual = float(cursor.fetchone()['total'])
         
         cursor.execute("""
             SELECT COALESCE(SUM(monto), 0) as total
             FROM gastos 
-            WHERE YEAR(fecha) = %s
+            WHERE EXTRACT(YEAR FROM fecha) = %s
         """, (año_actual,))
         total_gastos_anual = float(cursor.fetchone()['total'])
         
@@ -2882,7 +3171,7 @@ def add_page_number(canvas, doc):
 def descargar_reporte_pdf():
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener los parámetros de filtrado
         año_filtro = request.args.get('anio', str(datetime.now().year))
@@ -2908,8 +3197,8 @@ def descargar_reporte_pdf():
                 COALESCE(SUM(i.monto), 0) as total
             FROM categorias_ingreso c
             LEFT JOIN ingresos i ON c.id = i.categoria_id 
-                AND YEAR(i.fecha) = %s 
-                AND MONTH(i.fecha) = %s
+                AND EXTRACT(YEAR FROM i.fecha) = %s 
+                AND EXTRACT(MONTH FROM i.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
         """, (año, mes))
@@ -2922,8 +3211,8 @@ def descargar_reporte_pdf():
                 COALESCE(SUM(g.monto), 0) as total
             FROM categorias_gasto c
             LEFT JOIN gastos g ON c.id = g.categoria_id 
-                AND YEAR(g.fecha) = %s 
-                AND MONTH(g.fecha) = %s
+                AND EXTRACT(YEAR FROM g.fecha) = %s 
+                AND EXTRACT(MONTH FROM g.fecha) = %s
             GROUP BY c.id, c.nombre
             ORDER BY total DESC
         """, (año, mes))
@@ -3098,16 +3387,44 @@ def agregar_plan_alimentacion():
 @login_required
 def registro_alimentacion():
     db = get_db_connection()
-    cursor = db.cursor(dictionary=True)
+    cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    # Obtener registros de alimentación
     cursor.execute("""
         SELECT ra.*, a.nombre as nombre_animal, pa.nombre as plan_nombre 
         FROM registro_alimentacion ra 
         JOIN animales a ON ra.animal_id = a.id 
         JOIN planes_alimentacion pa ON ra.plan_id = pa.id 
+        WHERE ra.usuario_id = %s
         ORDER BY ra.fecha DESC
-    """)
+    """, (session['usuario_id'],))
     registros = cursor.fetchall()
-    return render_template('registro_alimentacion.html', registros=registros)
+    
+    # Obtener animales para los dropdowns
+    cursor.execute("""
+        SELECT id, nombre, numero_arete 
+        FROM animales 
+        WHERE usuario_id = %s 
+        ORDER BY nombre
+    """, (session['usuario_id'],))
+    animales = cursor.fetchall()
+    
+    # Obtener planes de alimentación
+    cursor.execute("""
+        SELECT id, nombre 
+        FROM planes_alimentacion 
+        WHERE usuario_id = %s 
+        ORDER BY nombre
+    """, (session['usuario_id'],))
+    planes = cursor.fetchall()
+    
+    cursor.close()
+    db.close()
+    
+    return render_template('registro_alimentacion.html', 
+                         registros=registros, 
+                         animales=animales, 
+                         planes=planes)
 
 @app.route('/registro_alimentacion/agregar', methods=['POST'])
 @login_required
@@ -3350,7 +3667,7 @@ def retirar_animales(pastizal_id):
 @login_required
 def detalles_pastizal(pastizal_id):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Obtener detalles del pastizal
@@ -3394,7 +3711,7 @@ def detalles_pastizal(pastizal_id):
 def obtener_inseminacion(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT i.*, a.nombre as nombre_animal, a.numero_arete as arete_animal
@@ -3422,13 +3739,13 @@ def obtener_inseminacion(id):
 def ver_registro_fiebre_aftosa(registro_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener detalles del registro
         cursor.execute("""
             SELECT f.*, 
-                   DATE_FORMAT(f.fecha_registro, '%d/%m/%Y') as fecha_registro_formato,
-                   DATE_FORMAT(f.fecha_proxima_aplicacion, '%d/%m/%Y') as fecha_proxima_aplicacion_formato,
+                   TO_CHAR(f.fecha_registro, 'DD/MM/YYYY') as fecha_registro_formato,
+                   TO_CHAR(f.fecha_proxima_aplicacion, 'DD/MM/YYYY') as fecha_proxima_aplicacion_formato,
                    p.nombre as provincia, c.nombre as canton, pa.nombre as parroquia
             FROM fiebre_aftosa f
             LEFT JOIN provincias p ON f.provincia_id = p.id
@@ -3467,7 +3784,7 @@ def ver_registro_fiebre_aftosa(registro_id):
 def obtener_animales_vacunados(registro_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener los animales vacunados para este registro
         cursor.execute("""
@@ -3492,9 +3809,9 @@ def obtener_animales_vacunados(registro_id):
 def fiebre_aftosa():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Obtener todos los animales
+        # Obtener todos los animales del usuario actual
         cursor.execute("""
             SELECT a.*, 
                    (SELECT MAX(f.fecha_registro) 
@@ -3502,11 +3819,12 @@ def fiebre_aftosa():
                     JOIN fiebre_aftosa_animal fa ON f.id = fa.fiebre_aftosa_id 
                     WHERE fa.animal_id = a.id) as ultima_vacunacion
             FROM animales a
+            WHERE a.usuario_id = %s
             ORDER BY a.id DESC
-        """)
+        """, (session['usuario_id'],))
         animales = cursor.fetchall()
         
-        # Obtener registros de fiebre aftosa con información completa
+        # Obtener registros de fiebre aftosa del usuario actual
         cursor.execute("""
             SELECT f.*, 
                    (SELECT COUNT(*) 
@@ -3521,8 +3839,9 @@ def fiebre_aftosa():
             LEFT JOIN provincias p ON f.provincia_id = p.id
             LEFT JOIN cantones c ON f.canton_id = c.id
             LEFT JOIN parroquias pa ON f.parroquia_id = pa.id
+            WHERE f.usuario_id = %s
             ORDER BY f.fecha_registro DESC
-        """)
+        """, (session['usuario_id'],))
         registros = cursor.fetchall()
         
         # Obtener provincias para el formulario
@@ -3573,7 +3892,7 @@ def eliminar_fiebre_aftosa(id):
 @login_required
 def registrar_inseminacion():
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         animal_id = request.form.get('animal_id')
@@ -3608,7 +3927,7 @@ def registrar_inseminacion():
 @login_required
 def actualizar_estado_inseminacion():
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         datos = request.get_json()
@@ -3634,7 +3953,7 @@ def actualizar_estado_inseminacion():
             UPDATE inseminaciones 
             SET exitosa = %s,
                 estado = %s,
-                observaciones = CONCAT(COALESCE(observaciones, ''), '\n', %s)
+                observaciones = COALESCE(observaciones, '') || '\n' || %s
             WHERE id = %s
         """, (exitosa, nuevo_estado, "Estado actualizado: " + nuevo_estado, inseminacion_id))
         
@@ -3676,26 +3995,28 @@ def actualizar_estado_inseminacion():
 def vitaminizacion():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Obtener todos los animales
+        # Obtener todos los animales del usuario actual
         cursor.execute("""
             SELECT a.*, 
                    (SELECT MAX(v.fecha_aplicacion) 
                     FROM vitaminizaciones v 
                     WHERE v.animal_id = a.id) as ultima_vitaminizacion
             FROM animales a
+            WHERE a.usuario_id = %s
             ORDER BY a.id DESC
-        """)
+        """, (session['usuario_id'],))
         animales = cursor.fetchall()
         
-        # Obtener registros de vitaminización
+        # Obtener registros de vitaminización del usuario actual
         cursor.execute("""
             SELECT v.*, a.numero_arete, a.nombre, a.condicion
             FROM vitaminizaciones v
             JOIN animales a ON v.animal_id = a.id
+            WHERE v.usuario_id = %s
             ORDER BY v.fecha_aplicacion DESC
-        """)
+        """, (session['usuario_id'],))
         registros = cursor.fetchall()
         
         cursor.close()
@@ -3754,12 +4075,12 @@ def registrar_vitaminizacion():
 def detalles_vitaminizacion(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         cursor.execute("""
             SELECT v.*, a.numero_arete, a.nombre, a.condicion,
-                   DATE_FORMAT(v.fecha_aplicacion, '%d/%m/%Y') as fecha_aplicacion_formato,
-                   DATE_FORMAT(v.fecha_proxima, '%d/%m/%Y') as proxima_aplicacion_formato
+                   TO_CHAR(v.fecha_aplicacion, 'DD/MM/YYYY') as fecha_aplicacion_formato,
+                   TO_CHAR(v.fecha_proxima, 'DD/MM/YYYY') as proxima_aplicacion_formato
             FROM vitaminizaciones v
             JOIN animales a ON v.animal_id = a.id
             WHERE v.id = %s
@@ -3807,9 +4128,9 @@ def eliminar_vitaminizacion(id):
 def carbunco():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Obtener todos los animales
+        # Obtener todos los animales del usuario actual
         cursor.execute("""
             SELECT a.*, 
                    (SELECT MAX(c.fecha_registro) 
@@ -3817,19 +4138,21 @@ def carbunco():
                     JOIN carbunco_animal ca ON c.id = ca.carbunco_id 
                     WHERE ca.animal_id = a.id) as ultima_vacunacion
             FROM animales a
+            WHERE a.usuario_id = %s
             ORDER BY a.id DESC
-        """)
+        """, (session['usuario_id'],))
         animales = cursor.fetchall()
         
-        # Obtener registros de carbunco con información completa
+        # Obtener registros de carbunco del usuario actual
         cursor.execute("""
             SELECT c.*, 
                    (SELECT COUNT(*) 
                     FROM carbunco_animal ca 
                     WHERE ca.carbunco_id = c.id) as cantidad_animales
             FROM carbunco c
+            WHERE c.usuario_id = %s
             ORDER BY c.fecha_registro DESC
-        """)
+        """, (session['usuario_id'],))
         registros = cursor.fetchall()
         
         cursor.close()
@@ -3914,12 +4237,12 @@ def eliminar_carbunco(id):
 def detalles_carbunco(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener detalles del registro de carbunco
         cursor.execute("""
-            SELECT c.*, DATE_FORMAT(c.fecha_registro, '%d/%m/%Y') as fecha_formato,
-                   DATE_FORMAT(c.fecha_proxima, '%d/%m/%Y') as proxima_aplicacion_formato
+            SELECT c.*, TO_CHAR(c.fecha_registro, 'DD/MM/YYYY') as fecha_formato,
+                   TO_CHAR(c.fecha_proxima, 'DD/MM/YYYY') as proxima_aplicacion_formato
             FROM carbunco c
             WHERE c.id = %s
         """, (id,))
@@ -3966,10 +4289,47 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # Crear tabla de usuarios si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                email VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                nombre VARCHAR(100),
+                apellido VARCHAR(100),
+                telefono VARCHAR(20),
+                direccion TEXT,
+                foto_perfil VARCHAR(500),
+                cargo VARCHAR(100),
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Crear tabla de animales si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS animales (
+                id SERIAL PRIMARY KEY,
+                numero_arete VARCHAR(50) UNIQUE NOT NULL,
+                nombre VARCHAR(100),
+                sexo VARCHAR(10) NOT NULL CHECK (sexo IN ('Macho', 'Hembra')),
+                raza VARCHAR(100),
+                condicion VARCHAR(20) NOT NULL CHECK (condicion IN ('Toro', 'Torete', 'Vaca', 'Vacona', 'Ternero', 'Ternera')),
+                fecha_nacimiento DATE,
+                propietario VARCHAR(200),
+                foto_path VARCHAR(500),
+                padre_arete VARCHAR(50),
+                madre_arete VARCHAR(50),
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
         # Crear tabla de inseminaciones si no existe
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS inseminaciones (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 animal_id INT NOT NULL,
                 fecha_inseminacion DATE NOT NULL,
                 tipo_inseminacion VARCHAR(50) NOT NULL,
@@ -3988,7 +4348,7 @@ def init_db():
         # Crear tabla de carbunco si no existe
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS carbunco (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 fecha_registro DATE NOT NULL,
                 producto VARCHAR(100) NOT NULL,
                 lote VARCHAR(50),
@@ -4003,7 +4363,7 @@ def init_db():
         # Crear tabla de relación carbunco_animal si no existe
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS carbunco_animal (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 carbunco_id INT NOT NULL,
                 animal_id INT NOT NULL,
                 FOREIGN KEY (carbunco_id) REFERENCES carbunco(id),
@@ -4041,14 +4401,13 @@ def init_db():
                 if cursor.fetchone()[0] == 0:
                     cursor.execute(f"""
                         ALTER TABLE inseminaciones 
-                        ADD COLUMN {columna} {definicion} 
-                        AFTER {after}
+                        ADD COLUMN {columna} {definicion}
                     """)
         
         # Crear tabla de genealogía si no existe
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS genealogia (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 animal_id INT NOT NULL,
                 padre_arete VARCHAR(50),
                 madre_arete VARCHAR(50),
@@ -4067,7 +4426,7 @@ def init_db():
         # Crear tabla de animales_pastizal si no existe
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS animales_pastizal (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 animal_id INT NOT NULL,
                 pastizal_id INT NOT NULL,
                 fecha_asignacion DATE NOT NULL,
@@ -4084,14 +4443,175 @@ def init_db():
         # Crear tabla de pastizales si no existe
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pastizales (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 nombre VARCHAR(100) NOT NULL,
                 ubicacion TEXT,
                 area DECIMAL(10,2),
-                estado ENUM('Activo', 'Inactivo', 'Mantenimiento') DEFAULT 'Activo',
+                estado VARCHAR(20) DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo', 'Mantenimiento')),
                 descripcion TEXT,
                 usuario_id INT,
                 fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de registro_leche si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS registro_leche (
+                id SERIAL PRIMARY KEY,
+                animal_id INT NOT NULL,
+                fecha DATE NOT NULL,
+                cantidad_manana DECIMAL(10,2),
+                cantidad_tarde DECIMAL(10,2),
+                total_dia DECIMAL(10,2),
+                observaciones TEXT,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (animal_id) REFERENCES animales(id),
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de ventas_leche si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ventas_leche (
+                id SERIAL PRIMARY KEY,
+                fecha DATE NOT NULL,
+                cantidad_litros DECIMAL(10,2) NOT NULL,
+                precio_litro DECIMAL(10,2) NOT NULL,
+                total DECIMAL(10,2) NOT NULL,
+                comprador VARCHAR(200),
+                forma_pago VARCHAR(20) DEFAULT 'Efectivo' CHECK (forma_pago IN ('Efectivo', 'Transferencia', 'Cheque', 'Otro')),
+                estado_pago VARCHAR(20) DEFAULT 'Pendiente' CHECK (estado_pago IN ('Pagado', 'Pendiente', 'Parcial')),
+                observaciones TEXT,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de ingresos si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ingresos (
+                id SERIAL PRIMARY KEY,
+                fecha DATE NOT NULL,
+                categoria VARCHAR(100) NOT NULL,
+                monto DECIMAL(10,2) NOT NULL,
+                descripcion TEXT,
+                comprobante VARCHAR(255),
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de gastos si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gastos (
+                id SERIAL PRIMARY KEY,
+                fecha DATE NOT NULL,
+                categoria VARCHAR(100) NOT NULL,
+                monto DECIMAL(10,2) NOT NULL,
+                descripcion TEXT,
+                comprobante VARCHAR(255),
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de desparasitaciones si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS desparasitaciones (
+                id SERIAL PRIMARY KEY,
+                fecha_registro DATE NOT NULL,
+                producto VARCHAR(100) NOT NULL,
+                lote VARCHAR(50),
+                aplicacion_general BOOLEAN DEFAULT TRUE,
+                proxima_aplicacion DATE,
+                usuario_id INT,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de vitaminizaciones si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vitaminizaciones (
+                id SERIAL PRIMARY KEY,
+                fecha_registro DATE NOT NULL,
+                producto VARCHAR(100) NOT NULL,
+                lote VARCHAR(50),
+                aplicacion_general BOOLEAN DEFAULT TRUE,
+                proxima_aplicacion DATE,
+                usuario_id INT,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de fiebre_aftosa si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fiebre_aftosa (
+                id SERIAL PRIMARY KEY,
+                fecha_registro DATE NOT NULL,
+                producto VARCHAR(100) NOT NULL,
+                lote VARCHAR(50),
+                aplicacion_general BOOLEAN DEFAULT TRUE,
+                proxima_aplicacion DATE,
+                usuario_id INT,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de gestaciones si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gestaciones (
+                id SERIAL PRIMARY KEY,
+                animal_id INT NOT NULL,
+                fecha_monta DATE NOT NULL,
+                fecha_probable_parto DATE NOT NULL,
+                estado VARCHAR(20) NOT NULL DEFAULT 'En Gestación' CHECK (estado IN ('En Gestación', 'Finalizado', 'Abortado')),
+                observaciones TEXT,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (animal_id) REFERENCES animales(id),
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de auditoria si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS auditoria (
+                id SERIAL PRIMARY KEY,
+                usuario_id INT,
+                accion VARCHAR(50) NOT NULL,
+                modulo VARCHAR(50) NOT NULL,
+                descripcion TEXT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de config_alarmas si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS config_alarmas (
+                id SERIAL PRIMARY KEY,
+                tipo VARCHAR(50) NOT NULL,
+                activo BOOLEAN DEFAULT TRUE,
+                dias_antes INTEGER DEFAULT 7,
+                usuario_id INT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+        """)
+        
+        # Crear tabla de alarmas_enviadas si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS alarmas_enviadas (
+                id SERIAL PRIMARY KEY,
+                tipo VARCHAR(50) NOT NULL,
+                descripcion TEXT,
+                fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                usuario_id INT,
                 FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
             )
         """)
@@ -4130,7 +4650,7 @@ def generar_reporte_pdf(tipo):
 
         # Obtener datos de los animales
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Construir consulta SQL
         query = "SELECT numero_arete, nombre, raza, condicion, sexo FROM animales WHERE usuario_id = %s"
@@ -4530,7 +5050,7 @@ def generar_reporte_gestacion():
 def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Construir la consulta base
         query = """
@@ -4734,7 +5254,7 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
 def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Construir la consulta base
         query = """
@@ -4942,7 +5462,7 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
 def generar_certificado_aftosa(certificado_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener información del registro de vacunación
         cursor.execute("""
@@ -5346,7 +5866,7 @@ def generar_pdf_carbunco(registro_id):
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Obtener datos del registro de carbunco
         cursor.execute('''
@@ -5550,7 +6070,7 @@ def generar_pdf_carbunco(registro_id):
 def vista_registro_leche():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         # Obtener registros de leche
         cursor.execute('''

@@ -4,6 +4,7 @@ from io import BytesIO
 import datetime
 from datetime import datetime, timedelta
 from src.database import get_db_connection
+import psycopg2.extras
 
 # Función auxiliar para convertir HTML a PDF
 def html_to_pdf(html_content):
@@ -17,7 +18,7 @@ def html_to_pdf(html_content):
 def generar_reporte_animales(categoria_animal, estado_animal):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -84,7 +85,7 @@ def generar_reporte_animales(categoria_animal, estado_animal):
 def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=None):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -216,7 +217,7 @@ def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=
 def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_fin=None):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -276,13 +277,13 @@ def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_f
         # Obtener próximas vacunaciones
         cursor.execute("""
             SELECT es.*, a.nombre_arete as animal, 
-                   DATE_ADD(es.fecha, INTERVAL es.recordatorio_dias DAY) as fecha_programada,
-                   DATEDIFF(DATE_ADD(es.fecha, INTERVAL es.recordatorio_dias DAY), CURDATE()) as dias_restantes
+                   (es.fecha + INTERVAL '1 day' * es.recordatorio_dias) as fecha_programada,
+                   ((es.fecha + INTERVAL '1 day' * es.recordatorio_dias) - CURRENT_DATE) as dias_restantes
             FROM eventos_salud es
             JOIN animales a ON es.animal_id = a.id
             WHERE es.tipo = 'Vacunación'
             AND es.recordatorio_dias > 0
-            AND DATE_ADD(es.fecha, INTERVAL es.recordatorio_dias DAY) >= CURDATE()
+            AND (es.fecha + INTERVAL '1 day' * es.recordatorio_dias) >= CURRENT_DATE
             ORDER BY fecha_programada
             LIMIT 10
         """)
@@ -324,7 +325,7 @@ def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_f
 def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=None):
     try:
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
