@@ -20,7 +20,7 @@ from functools import wraps
 import uuid
 import logging
 import shutil
-from logging.handlers import RotatingFileHandler
+
 from src.gestacion import registrar_gestacion, obtener_gestaciones, actualizar_estado_gestacion, obtener_gestaciones_proximas, eliminar_gestacion
 from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp

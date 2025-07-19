@@ -6,11 +6,10 @@ import logging
 from datetime import datetime, timedelta
 import os
 
-# Configurar logging
+# Configurar logging para Vercel (sin archivo de log)
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='database_connection.log'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
