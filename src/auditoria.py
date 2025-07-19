@@ -3,6 +3,11 @@ from flask import request, session
 import logging
 from datetime import datetime
 import psycopg2.extras
+import pg8000
+
+def dictfetchall(cursor):
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 # Configurar logger
 logger = logging.getLogger('auditoria')
@@ -116,7 +121,7 @@ class SistemaAuditoria:
                 logger.error("No se pudo conectar a la base de datos para obtener historial")
                 return []
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             cursor.execute("""
                 SELECT * FROM auditoria 
@@ -124,7 +129,7 @@ class SistemaAuditoria:
                 LIMIT %s
             """, (limite,))
             
-            return cursor.fetchall()
+            return dictfetchall(cursor)
             
         except Exception as e:
             logger.error(f"Error al obtener historial: {e}")
@@ -152,7 +157,7 @@ class SistemaAuditoria:
                 logger.error("No se pudo conectar a la base de datos para obtener actividad reciente")
                 return []
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             if usuario_id:
                 # Filtrar por usuario específico
@@ -186,7 +191,7 @@ class SistemaAuditoria:
                     LIMIT %s
                 """, (limite,))
             
-            actividades = cursor.fetchall()
+            actividades = dictfetchall(cursor)
             
             # Formatear las fechas para mejor visualización
             for actividad in actividades:

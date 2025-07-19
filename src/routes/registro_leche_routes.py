@@ -1,20 +1,22 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from functools import wraps
+import pg8000
 from datetime import datetime
-import psycopg2
-import psycopg2.extras
-import os
 
 # Crear el blueprint para registro_leche
 registro_leche_bp = Blueprint('registro_leche', __name__)
+
+def dictfetchall(cursor):
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 # Función para obtener conexión a la base de datos
 def get_db_connection():
     try:
         db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
-        conn = psycopg2.connect(db_url)
+        conn = pg8000.connect(db_url)
         return conn
-    except psycopg2.Error as e:
+    except Exception as e:
         print(f"Error al conectar a la base de datos: {e}")
         return None
 
@@ -38,7 +40,7 @@ def vista_registro_leche():
             flash('Error al conectar con la base de datos', 'danger')
             return render_template('registro_leche.html', registros=[], animales=[])
             
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -65,7 +67,7 @@ def vista_registro_leche():
         query += " ORDER BY rl.fecha DESC"
         
         cursor.execute(query, params)
-        registros = cursor.fetchall()
+        registros = dictfetchall(cursor)
         
         # Obtener lista de animales para el selector
         cursor.execute("""
@@ -75,7 +77,7 @@ def vista_registro_leche():
             AND condicion IN ('Vaca', 'Vacona')
             ORDER BY nombre
         """)
-        animales = cursor.fetchall()
+        animales = dictfetchall(cursor)
         
         return render_template('registro_leche.html', registros=registros, animales=animales)
     
@@ -241,7 +243,7 @@ def obtener_registro_leche(registro_id):
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         cursor.execute("""
             SELECT rl.*, a.nombre as nombre_animal 
@@ -250,7 +252,7 @@ def obtener_registro_leche(registro_id):
             WHERE rl.id = %s
         """, (registro_id,))
         
-        registro = cursor.fetchone()
+        registro = dictfetchall(cursor)
         
         if not registro:
             return jsonify({'success': False, 'message': 'Registro no encontrado'}), 404

@@ -1,4 +1,4 @@
-from app.wsgi import application
+from app import app
 
-# Esta línea es necesaria para Vercel
-app = application
+if __name__ == "__main__":
+    app.run()

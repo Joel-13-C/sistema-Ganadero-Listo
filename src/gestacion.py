@@ -1,13 +1,18 @@
+import pg8000
 from datetime import datetime, timedelta
 from src.database import get_db_connection
 from flask import flash
-import psycopg2.extras
+
+def dictfetchall(cursor):
+    """Convierte los resultados del cursor a una lista de diccionarios."""
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 def registrar_gestacion(animal_id, fecha_monta, observaciones):
     try:
         # Validar que el animal existe y es hembra
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         cursor.execute("""
             SELECT id, sexo, condicion 
@@ -57,7 +62,7 @@ def registrar_gestacion(animal_id, fecha_monta, observaciones):
 def obtener_gestaciones(usuario_id=None):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         if usuario_id:
             cursor.execute("""
@@ -75,7 +80,7 @@ def obtener_gestaciones(usuario_id=None):
                 ORDER BY g.fecha_actualizacion DESC
             """)
         
-        gestaciones = cursor.fetchall()
+        gestaciones = dictfetchall(cursor)
         
         # Calcular días restantes para cada gestación y actualizar estado si es necesario
         for g in gestaciones:
@@ -114,7 +119,7 @@ def obtener_gestaciones(usuario_id=None):
 def obtener_gestaciones_proximas():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener gestaciones que están a 7 días o menos del parto y aún están activas
         cursor.execute("""
@@ -127,7 +132,7 @@ def obtener_gestaciones_proximas():
             ORDER BY g.fecha_probable_parto ASC
         """)
         
-        gestaciones_proximas = cursor.fetchall()
+        gestaciones_proximas = dictfetchall(cursor)
         cursor.close()
         conn.close()
         
@@ -175,7 +180,7 @@ def eliminar_gestacion(gestacion_id):
     """
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Verificar que la gestación existe
         cursor.execute("SELECT id FROM gestaciones WHERE id = %s", (gestacion_id,))

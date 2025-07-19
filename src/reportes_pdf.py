@@ -5,6 +5,11 @@ import datetime
 from datetime import datetime, timedelta
 from src.database import get_db_connection
 import psycopg2.extras
+import pg8000
+
+def dictfetchall(cursor):
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 # Función auxiliar para convertir HTML a PDF
 def html_to_pdf(html_content):
@@ -18,7 +23,7 @@ def html_to_pdf(html_content):
 def generar_reporte_animales(categoria_animal, estado_animal):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -44,7 +49,7 @@ def generar_reporte_animales(categoria_animal, estado_animal):
         
         # Ejecutar la consulta
         cursor.execute(query, params)
-        animales = cursor.fetchall()
+        animales = dictfetchall(cursor)
         
         # Calcular estadísticas
         total_machos = sum(1 for animal in animales if animal['sexo'] == 'Macho')
@@ -85,7 +90,7 @@ def generar_reporte_animales(categoria_animal, estado_animal):
 def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=None):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -126,7 +131,7 @@ def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=
             WHERE i.fecha BETWEEN %s AND %s
             ORDER BY i.fecha
         """, (fecha_inicio, fecha_fin))
-        ingresos = cursor.fetchall()
+        ingresos = dictfetchall(cursor)
         
         # Obtener gastos en el período
         cursor.execute("""
@@ -136,7 +141,7 @@ def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=
             WHERE g.fecha BETWEEN %s AND %s
             ORDER BY g.fecha
         """, (fecha_inicio, fecha_fin))
-        gastos = cursor.fetchall()
+        gastos = dictfetchall(cursor)
         
         # Calcular totales
         total_ingresos = sum(float(ingreso['monto']) for ingreso in ingresos)
@@ -153,7 +158,7 @@ def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=
             GROUP BY ci.nombre
             ORDER BY monto DESC
         """, (fecha_inicio, fecha_fin))
-        for categoria in cursor.fetchall():
+        for categoria in dictfetchall(cursor):
             porcentaje = (float(categoria['monto']) / total_ingresos * 100) if total_ingresos > 0 else 0
             ingresos_por_categoria.append({
                 'nombre': categoria['nombre'],
@@ -171,7 +176,7 @@ def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=
             GROUP BY cg.nombre
             ORDER BY monto DESC
         """, (fecha_inicio, fecha_fin))
-        for categoria in cursor.fetchall():
+        for categoria in dictfetchall(cursor):
             porcentaje = (float(categoria['monto']) / total_gastos * 100) if total_gastos > 0 else 0
             gastos_por_categoria.append({
                 'nombre': categoria['nombre'],
@@ -217,7 +222,7 @@ def generar_reporte_financiero(periodo_financiero, fecha_inicio=None, fecha_fin=
 def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_fin=None):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -267,7 +272,7 @@ def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_f
         
         # Ejecutar la consulta
         cursor.execute(query, params)
-        eventos = cursor.fetchall()
+        eventos = dictfetchall(cursor)
         
         # Calcular estadísticas
         total_vacunaciones = sum(1 for evento in eventos if evento['tipo'] == 'Vacunación')
@@ -287,7 +292,7 @@ def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_f
             ORDER BY fecha_programada
             LIMIT 10
         """)
-        proximas_vacunas = cursor.fetchall()
+        proximas_vacunas = dictfetchall(cursor)
         
         # Renderizar la plantilla HTML
         html = render_template('reportes_pdf/reporte_salud.html',
@@ -325,7 +330,7 @@ def generar_reporte_salud(periodo_salud, tipo_evento, fecha_inicio=None, fecha_f
 def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=None):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Fecha de generación del reporte
         fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -366,7 +371,7 @@ def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=
             WHERE rl.fecha BETWEEN %s AND %s
             ORDER BY rl.fecha
         """, (fecha_inicio, fecha_fin))
-        registros_leche = cursor.fetchall()
+        registros_leche = dictfetchall(cursor)
         
         # Calcular totales
         total_leche = sum(float(registro['total_dia']) for registro in registros_leche)
@@ -395,7 +400,7 @@ def generar_reporte_produccion(periodo_produccion, fecha_inicio=None, fecha_fin=
             GROUP BY a.id
             ORDER BY total DESC
         """, (fecha_inicio, fecha_fin))
-        for animal in cursor.fetchall():
+        for animal in dictfetchall(cursor):
             promedio = float(animal['total']) / animal['dias'] if animal['dias'] > 0 else 0
             produccion_por_animal.append({
                 'nombre': animal['nombre'],

@@ -7,10 +7,15 @@ from flask import session
 import os
 import psycopg2
 import psycopg2.extras
+import pg8000
 
 # Configurar logger
 logger = logging.getLogger('alarmas')
 logger.setLevel(logging.INFO)
+
+def dictfetchall(cursor):
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 class SistemaAlarmas:
     def __init__(self, db_connection, email_config=None):
@@ -201,7 +206,7 @@ class SistemaAlarmas:
                 logger.error("No se pudo conectar a la base de datos para obtener configuración de alarmas")
                 return {}
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             # Obtener configuraciones de alarmas
             cursor.execute("""
@@ -209,7 +214,7 @@ class SistemaAlarmas:
                 WHERE usuario_id = %s
             """, (usuario_id,))
             
-            configuraciones = cursor.fetchall()
+            configuraciones = dictfetchall(cursor)
             
             # Organizar por tipo
             config = {}
@@ -245,7 +250,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             # Obtener configuraciones de alarmas de desparasitación activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'desparasitacion' AND activo = TRUE"
@@ -253,7 +258,7 @@ class SistemaAlarmas:
             
             cursor.execute(query_config)
             
-            configuraciones = cursor.fetchall()
+            configuraciones = dictfetchall(cursor)
             print(f"Configuraciones de alarmas activas encontradas: {len(configuraciones)}")
             
             # Si no hay configuraciones, usar una configuración predeterminada con el correo configurado
@@ -297,7 +302,7 @@ class SistemaAlarmas:
                 
                 cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'),))
                 
-                desparasitaciones = cursor.fetchall()
+                desparasitaciones = dictfetchall(cursor)
                 print(f"Desparasitaciones pendientes encontradas: {len(desparasitaciones)}")
                 
                 if desparasitaciones:
@@ -384,7 +389,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             # Obtener configuraciones de alarmas de parto activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'parto' AND activo = TRUE"
@@ -392,7 +397,7 @@ class SistemaAlarmas:
             
             cursor.execute(query_config)
             
-            configuraciones = cursor.fetchall()
+            configuraciones = dictfetchall(cursor)
             print(f"Configuraciones de alarmas activas encontradas: {len(configuraciones)}")
             
             # Si no hay configuraciones, usar una configuración predeterminada con el correo configurado
@@ -438,7 +443,7 @@ class SistemaAlarmas:
                 
                 cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'),))
                 
-                animales = cursor.fetchall()
+                animales = dictfetchall(cursor)
                 print(f"Animales con partos próximos encontrados: {len(animales)}")
                 
                 if animales:
@@ -525,7 +530,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             # Obtener configuraciones de alarmas de vacunación activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'vacunacion' AND activo = TRUE"
@@ -533,7 +538,7 @@ class SistemaAlarmas:
             
             cursor.execute(query_config)
             
-            configuraciones = cursor.fetchall()
+            configuraciones = dictfetchall(cursor)
             print(f"Configuraciones de alarmas activas encontradas: {len(configuraciones)}")
             
             # Si no hay configuraciones, usar una configuración predeterminada con el correo configurado
@@ -580,7 +585,7 @@ class SistemaAlarmas:
                 
                 cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'), usuario_id))
                 
-                vacunaciones = cursor.fetchall()
+                vacunaciones = dictfetchall(cursor)
                 print(f"Vacunaciones pendientes encontradas: {len(vacunaciones)}")
                 
                 if vacunaciones:
@@ -663,7 +668,7 @@ class SistemaAlarmas:
                 print("Error: No se pudo conectar a la base de datos")
                 return 0
                 
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             # Obtener configuraciones de alarmas de vitaminización activas
             query_config = "SELECT * FROM config_alarmas WHERE tipo = 'vitaminizacion' AND activo = TRUE"
@@ -671,7 +676,7 @@ class SistemaAlarmas:
             
             cursor.execute(query_config)
             
-            configuraciones = cursor.fetchall()
+            configuraciones = dictfetchall(cursor)
             print(f"Configuraciones de alarmas activas encontradas: {len(configuraciones)}")
             
             # Si no hay configuraciones, usar una configuración predeterminada con el correo configurado
@@ -716,7 +721,7 @@ class SistemaAlarmas:
                 
                 cursor.execute(query, (fecha_limite.strftime('%Y-%m-%d'), usuario_id))
                 
-                vitaminizaciones = cursor.fetchall()
+                vitaminizaciones = dictfetchall(cursor)
                 print(f"Vitaminizaciones pendientes encontradas: {len(vitaminizaciones)}")
                 
                 if vitaminizaciones:

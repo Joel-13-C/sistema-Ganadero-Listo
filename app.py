@@ -32,6 +32,7 @@ from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
 import psycopg2.extras
+import pg8000
 
 # Configuración para Vercel (sin carpetas locales)
 # UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
@@ -224,7 +225,7 @@ def login_required(f):
 def dashboard():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         usuario_id = session.get('usuario_id')
         print(f"Dashboard - Usuario ID: {usuario_id}")
@@ -1187,7 +1188,7 @@ def gestacion():
     try:
         # Obtener solo animales hembra (vacas y vaconas) del usuario actual
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Verificar si hay animales para este usuario
         cursor.execute("""
@@ -1367,7 +1368,7 @@ def vacunas():
 def desparasitacion():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener todos los animales
         cursor.execute("""
@@ -1452,7 +1453,7 @@ def registrar_desparasitacion():
 def detalles_desparasitacion(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener detalles del registro
         cursor.execute("""
@@ -1516,7 +1517,7 @@ def menu_desparasitacion():
 def obtener_cantones(provincia_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Verificar si la provincia existe
         cursor.execute("SELECT id FROM provincias WHERE id = %s", (provincia_id,))
@@ -1550,7 +1551,7 @@ def obtener_cantones(provincia_id):
 def obtener_parroquias(canton_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Verificar si el cantón existe
         cursor.execute("SELECT id FROM cantones WHERE id = %s", (canton_id,))
@@ -1609,7 +1610,7 @@ def registrar_fiebre_aftosa():
         app.logger.info(f'Próxima aplicación calculada: {proxima_aplicacion}')
 
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
 
         try:
             # Insertar registro de fiebre aftosa
@@ -1686,7 +1687,7 @@ def registrar_fiebre_aftosa():
 def detalles_fiebre_aftosa(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener detalles de la vacunación
         cursor.execute("""
@@ -1729,7 +1730,7 @@ def detalles_fiebre_aftosa(id):
 @login_required
 def pastizales():
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor = conn.cursor()
     
     try:
         # Obtener todos los pastizales del usuario
@@ -1786,7 +1787,7 @@ def registrar_pastizal():
 @login_required
 def obtener_animales_disponibles(pastizal_id):
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor = conn.cursor()
     
     try:
         # Obtener información del pastizal
@@ -1909,7 +1910,7 @@ def asignar_animales(pastizal_id):
 def inseminaciones():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener todas las inseminaciones del usuario actual con detalles del animal
         cursor.execute("""
@@ -2116,7 +2117,7 @@ def editar_inseminacion(id):
 def genealogia():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener registros genealógicos del usuario actual con nombres de animales
         cursor.execute("""
@@ -2191,7 +2192,7 @@ def agregar_genealogia():
 def obtener_genealogia(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         cursor.execute("""
             SELECT g.*, 
@@ -2297,7 +2298,7 @@ def registro_leche_redirect():
 def obtener_registro_leche(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         cursor.execute("""
             SELECT p.*, a.nombre as nombre_animal,
@@ -2377,7 +2378,7 @@ def editar_registro_leche(id):
 def ventas_leche():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -2530,7 +2531,7 @@ def editar_venta_leche(id):
         else:
             # Obtener datos de la venta para el formulario
             db = get_db_connection()
-            cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = db.cursor()
             cursor.execute("SELECT * FROM ventas_leche WHERE id = %s", (id,))
             venta = cursor.fetchone()
             cursor.close()
@@ -2555,7 +2556,7 @@ def editar_venta_leche(id):
 def ingresos():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -2675,7 +2676,7 @@ def agregar_ingreso():
 def eliminar_ingreso(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Primero obtenemos la información del ingreso para eliminar el comprobante si existe
         cursor.execute("SELECT comprobante FROM ingresos WHERE id = %s", (id,))
@@ -2711,7 +2712,7 @@ def eliminar_ingreso(id):
 def obtener_ingreso(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         cursor.execute("""
             SELECT i.*, c.nombre as categoria_nombre 
@@ -2747,7 +2748,7 @@ def actualizar_ingreso(id):
         descripcion = request.form.get('descripcion', '')
         
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Verificar si el ingreso existe
         cursor.execute("SELECT * FROM ingresos WHERE id = %s", (id,))
@@ -2805,7 +2806,7 @@ def actualizar_ingreso(id):
 def gastos():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener filtros
         fecha = request.args.get('fecha')
@@ -2925,7 +2926,7 @@ def agregar_gasto():
 def eliminar_gasto(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Primero obtenemos la información del gasto para eliminar el comprobante si existe
         cursor.execute("SELECT comprobante FROM gastos WHERE id = %s", (id,))
@@ -2961,7 +2962,7 @@ def eliminar_gasto(id):
 def obtener_gasto(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener los datos del gasto
         cursor.execute("""
@@ -2998,7 +2999,7 @@ def actualizar_gasto(id):
         descripcion = request.form.get('descripcion', '')
         
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Primero obtenemos la información actual del gasto
         cursor.execute("SELECT comprobante FROM gastos WHERE id = %s", (id,))
@@ -3054,7 +3055,7 @@ def actualizar_gasto(id):
 def reportes_financieros():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener el año y mes actual
         fecha_actual = datetime.now()
@@ -3171,7 +3172,7 @@ def add_page_number(canvas, doc):
 def descargar_reporte_pdf():
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         # Obtener los parámetros de filtrado
         año_filtro = request.args.get('anio', str(datetime.now().year))
@@ -3387,7 +3388,7 @@ def agregar_plan_alimentacion():
 @login_required
 def registro_alimentacion():
     db = get_db_connection()
-    cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor = db.cursor()
     
     # Obtener registros de alimentación
     cursor.execute("""
@@ -3667,7 +3668,7 @@ def retirar_animales(pastizal_id):
 @login_required
 def detalles_pastizal(pastizal_id):
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor = conn.cursor()
     
     try:
         # Obtener detalles del pastizal
@@ -3711,7 +3712,7 @@ def detalles_pastizal(pastizal_id):
 def obtener_inseminacion(id):
     try:
         db = get_db_connection()
-        cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = db.cursor()
         
         cursor.execute("""
             SELECT i.*, a.nombre as nombre_animal, a.numero_arete as arete_animal
@@ -3739,7 +3740,7 @@ def obtener_inseminacion(id):
 def ver_registro_fiebre_aftosa(registro_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener detalles del registro
         cursor.execute("""
@@ -3784,7 +3785,7 @@ def ver_registro_fiebre_aftosa(registro_id):
 def obtener_animales_vacunados(registro_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener los animales vacunados para este registro
         cursor.execute("""
@@ -3809,7 +3810,7 @@ def obtener_animales_vacunados(registro_id):
 def fiebre_aftosa():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener todos los animales del usuario actual
         cursor.execute("""
@@ -3892,7 +3893,7 @@ def eliminar_fiebre_aftosa(id):
 @login_required
 def registrar_inseminacion():
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor = conn.cursor()
     
     try:
         animal_id = request.form.get('animal_id')
@@ -3927,7 +3928,7 @@ def registrar_inseminacion():
 @login_required
 def actualizar_estado_inseminacion():
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor = conn.cursor()
     
     try:
         datos = request.get_json()
@@ -3995,7 +3996,7 @@ def actualizar_estado_inseminacion():
 def vitaminizacion():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener todos los animales del usuario actual
         cursor.execute("""
@@ -4075,7 +4076,7 @@ def registrar_vitaminizacion():
 def detalles_vitaminizacion(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         cursor.execute("""
             SELECT v.*, a.numero_arete, a.nombre, a.condicion,
@@ -4128,7 +4129,7 @@ def eliminar_vitaminizacion(id):
 def carbunco():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener todos los animales del usuario actual
         cursor.execute("""
@@ -4237,7 +4238,7 @@ def eliminar_carbunco(id):
 def detalles_carbunco(id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener detalles del registro de carbunco
         cursor.execute("""
@@ -4650,7 +4651,7 @@ def generar_reporte_pdf(tipo):
 
         # Obtener datos de los animales
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Construir consulta SQL
         query = "SELECT numero_arete, nombre, raza, condicion, sexo FROM animales WHERE usuario_id = %s"
@@ -5050,7 +5051,7 @@ def generar_reporte_gestacion():
 def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Construir la consulta base
         query = """
@@ -5254,7 +5255,7 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
 def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Construir la consulta base
         query = """
@@ -5462,7 +5463,7 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
 def generar_certificado_aftosa(certificado_id):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener información del registro de vacunación
         cursor.execute("""
@@ -5866,7 +5867,7 @@ def generar_pdf_carbunco(registro_id):
     cursor = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
         
         # Obtener datos del registro de carbunco
         cursor.execute('''
@@ -6070,7 +6071,7 @@ def generar_pdf_carbunco(registro_id):
 def vista_registro_leche():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()
 
         # Obtener registros de leche
         cursor.execute('''

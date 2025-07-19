@@ -1,6 +1,5 @@
 from flask import Flask
-import psycopg2
-import psycopg2.extras
+import pg8000
 import hashlib
 import sys
 import logging
@@ -21,30 +20,42 @@ class DatabaseConnection:
             # Configuración de PostgreSQL
             self.db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
             
-            # Intentar establecer la conexión
-            self.connection = psycopg2.connect(self.db_url)
+            # Parsear la URL de conexión
+            from urllib.parse import urlparse
+            parsed = urlparse(self.db_url)
             
-            if self.connection.closed:
-                raise Exception("No se pudo establecer la conexión con la base de datos")
+            # Intentar establecer la conexión con pg8000
+            self.connection = pg8000.Connection(
+                host=parsed.hostname,
+                port=parsed.port or 5432,
+                user=parsed.username,
+                password=parsed.password,
+                database=parsed.path[1:] if parsed.path else 'ganadero_anwt'
+            )
             
             logger.info("Conexión a PostgreSQL establecida exitosamente")
             
-        except psycopg2.Error as err:
-            logger.error(f"Error al conectar a PostgreSQL: {err}")
-            raise Exception(f"Error de conexión a PostgreSQL: {err}")
         except Exception as e:
-            logger.error(f"Error general al inicializar la base de datos: {e}")
-            raise
+            logger.error(f"Error al conectar a PostgreSQL: {e}")
+            raise Exception(f"Error de conexión a PostgreSQL: {e}")
 
     def get_connection(self):
         """
         Obtiene una conexión a la base de datos, reconectando si es necesario
         """
         try:
-            if not hasattr(self, 'connection') or self.connection.closed:
-                self.connection = psycopg2.connect(self.db_url)
+            if not hasattr(self, 'connection') or self.connection.is_closed():
+                from urllib.parse import urlparse
+                parsed = urlparse(self.db_url)
+                self.connection = pg8000.Connection(
+                    host=parsed.hostname,
+                    port=parsed.port or 5432,
+                    user=parsed.username,
+                    password=parsed.password,
+                    database=parsed.path[1:] if parsed.path else 'ganadero_anwt'
+                )
             return self.connection
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al obtener conexión: {err}")
             raise Exception("No se pudo establecer la conexión con la base de datos")
 
@@ -60,7 +71,7 @@ class DatabaseConnection:
         try:
             connection = self.get_connection()
             
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 # Primero intentamos con la contraseña sin hash
                 cursor.execute("""
                     SELECT * FROM usuarios 
@@ -84,7 +95,7 @@ class DatabaseConnection:
                 logger.info(f"Inicio de sesión exitoso para el usuario: {username}")
                 return user
                 
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al validar usuario: {err}")
             raise Exception("Error al validar las credenciales del usuario")
     
@@ -102,7 +113,7 @@ class DatabaseConnection:
                 logger.info(f"Usuario {username} registrado exitosamente")
                 return cursor.lastrowid
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al registrar usuario: {err}")
             connection.rollback()
             raise
@@ -119,14 +130,14 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 query = "SELECT * FROM usuarios WHERE email = %s"
                 cursor.execute(query, (email,))
                 
                 result = cursor.fetchone()
                 return result is not None
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al verificar email existente: {err}")
             return False
 
@@ -142,14 +153,14 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 query = "SELECT * FROM usuarios WHERE username = %s"
                 cursor.execute(query, (username,))
                 
                 result = cursor.fetchone()
                 return result is not None
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al verificar username existente: {err}")
             return False
 
@@ -165,13 +176,13 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 query = "SELECT * FROM usuarios WHERE id = %s"
                 cursor.execute(query, (usuario_id,))
                 
                 return cursor.fetchone()
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al obtener usuario por ID: {err}")
             return None
 
@@ -195,28 +206,28 @@ class DatabaseConnection:
         try:
             # Primero verificamos si las columnas cargo y dirección existen
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 # Verificar si la columna cargo existe
                 cursor.execute("""
                     SELECT COUNT(*) as count
                     FROM information_schema.COLUMNS 
-                    WHERE TABLE_SCHEMA = DATABASE() 
+                    WHERE TABLE_SCHEMA = current_database() 
                     AND TABLE_NAME = 'usuarios' 
                     AND COLUMN_NAME = 'cargo'
                 """)
                 result = cursor.fetchone()
-                cargo_exists = result['count'] > 0
+                cargo_exists = result[0] > 0
                 
                 # Verificar si la columna dirección existe
                 cursor.execute("""
                     SELECT COUNT(*) as count
                     FROM information_schema.COLUMNS 
-                    WHERE TABLE_SCHEMA = DATABASE() 
+                    WHERE TABLE_SCHEMA = current_database() 
                     AND TABLE_NAME = 'usuarios' 
                     AND COLUMN_NAME = 'direccion'
                 """)
                 result = cursor.fetchone()
-                direccion_exists = result['count'] > 0
+                direccion_exists = result[0] > 0
                 
                 # Si las columnas no existen, las creamos
                 if not cargo_exists:
@@ -269,9 +280,9 @@ class DatabaseConnection:
                 logger.info(f"Perfil del usuario {usuario_id} actualizado correctamente")
                 return True
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al actualizar perfil de usuario: {err}")
-            if connection and not connection.closed:
+            if connection and not connection.is_closed():
                 connection.rollback()
             return False
         except Exception as e:
@@ -306,7 +317,7 @@ class DatabaseConnection:
                 connection.commit()
                 return True
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al actualizar contraseña de usuario: {err}")
             return False
 
@@ -334,7 +345,7 @@ class DatabaseConnection:
                 result = cursor.fetchone()
                 return result is not None
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al verificar contraseña: {err}")
             return False
 
@@ -379,9 +390,9 @@ class DatabaseConnection:
                 connection.commit()
                 return result[0] if result else None
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al registrar animal: {err}")
-            if connection and not connection.closed:
+            if connection and not connection.is_closed():
                 connection.rollback()
             return None
 
@@ -398,30 +409,32 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 # Consulta simple que no usa JOIN (porque no hay relaciones por ID)
                 cursor.execute("SELECT * FROM animales WHERE id = %s", (animal_id,))
                 animal = cursor.fetchone()
                 
                 if animal:
                     # Si el animal tiene referencias a padre o madre por arete, podemos buscar sus nombres
-                    if animal.get('padre_arete'):
+                    if animal[8]:  # padre_arete
                         cursor.execute("SELECT nombre FROM animales WHERE numero_arete = %s", 
-                                      (animal['padre_arete'],))
+                                      (animal[8],))
                         padre = cursor.fetchone()
                         if padre:
-                            animal['nombre_padre'] = padre['nombre']
+                            animal = list(animal)
+                            animal.append(padre[1])  # nombre_padre
                     
-                    if animal.get('madre_arete'):
+                    if animal[9]:  # madre_arete
                         cursor.execute("SELECT nombre FROM animales WHERE numero_arete = %s", 
-                                      (animal['madre_arete'],))
+                                      (animal[9],))
                         madre = cursor.fetchone()
                         if madre:
-                            animal['nombre_madre'] = madre['nombre']
+                            animal = list(animal)
+                            animal.append(madre[1])  # nombre_madre
                 
                 return animal
                 
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al obtener animal por ID: {err}")
             return None
     def obtener_animales(self, usuario_id=None, filtros=None):
@@ -438,7 +451,7 @@ class DatabaseConnection:
         try:
             print(f"Obteniendo animales para usuario_id: {usuario_id}")
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 # Consulta base con filtro de usuario
                 query = """
                     SELECT * FROM animales 
@@ -474,7 +487,7 @@ class DatabaseConnection:
                 
                 return resultados
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al obtener animales: {err}")
             return []
             
@@ -505,7 +518,7 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 # Intentar convertir a entero para búsqueda por ID
                 try:
                     animal_id = int(identificador)
@@ -526,7 +539,7 @@ class DatabaseConnection:
                 
                 return cursor.fetchall()
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al buscar animal por identificador: {err}")
             return []
 
@@ -562,9 +575,9 @@ class DatabaseConnection:
                 connection.commit()
                 return True
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al eliminar animal: {err}")
-            if connection and not connection.closed:
+            if connection and not connection.is_closed():
                 connection.rollback()
             return False
     
@@ -580,7 +593,7 @@ class DatabaseConnection:
         """
         try:
             connection = self.get_connection()
-            with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with connection.cursor() as cursor:
                 cursor.execute("""
                     SELECT g.*, a.nombre as nombre_vaca, a.numero_arete as arete_vaca,
                            t.nombre as nombre_toro, t.numero_arete as arete_toro
@@ -595,12 +608,13 @@ class DatabaseConnection:
                 
                 # Calcular fecha probable de parto (283 días después de la monta)
                 for g in gestaciones:
-                    if g['fecha_monta']:
-                        g['fecha_probable_parto'] = g['fecha_monta'] + timedelta(days=283)
+                    if g[3]:  # fecha_monta
+                        g = list(g)
+                        g.append(g[3] + timedelta(days=283))  # fecha_probable_parto
                 
                 return gestaciones
         
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al obtener gestaciones: {err}")
             return []
 
