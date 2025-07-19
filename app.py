@@ -32,10 +32,10 @@ from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
 
-# Asegurarse de que existen los directorios necesarios
-UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
-for folder in UPLOAD_FOLDERS:
-    os.makedirs(folder, exist_ok=True)
+# Configuración para Vercel (sin carpetas locales)
+# UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
+# for folder in UPLOAD_FOLDERS:
+#     os.makedirs(folder, exist_ok=True)
 
 # Inicializar el chatbot
 chatbot = None
@@ -46,8 +46,14 @@ db_connection = None
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.config['SECRET_KEY'] = os.urandom(24)  # Clave secreta para sesiones
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+
+# Función para validar archivos de imagen de perfil
+def allowed_file_perfil(filename):
+    """Verifica si el archivo tiene una extensión permitida para perfiles"""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Registrar el blueprint de registro_leche
 app.register_blueprint(registro_leche_bp, url_prefix='/registro_leche')
@@ -81,43 +87,43 @@ scheduler.add_job(func=verificar_alarmas_programadas, trigger="date", run_date=d
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
-# Función para servir archivos estáticos
-def serve_file(directory, filename, mimetype=None):
-    """Función centralizada para servir archivos estáticos de forma segura"""
-    if '..' in filename or filename.startswith('/'):
-        return "Acceso denegado", 403
-        
-    filepath = os.path.join(directory, filename)
-    if not os.path.exists(filepath):
-        return f"Archivo no encontrado: {filename}", 404
-        
-    if mimetype is None:
-        # Determinar el tipo MIME basado en la extensión
-        extension = filename.split('.')[-1].lower() if '.' in filename else ''
-        mimetypes = {
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'gif': 'image/gif',
-            'pdf': 'application/pdf'
-        }
-        mimetype = mimetypes.get(extension)
-    
-    return send_from_directory(directory, filename, mimetype=mimetype)
+# Función para servir archivos estáticos (COMENTADA para Vercel)
+# def serve_file(directory, filename, mimetype=None):
+#     """Función centralizada para servir archivos estáticos de forma segura"""
+#     if '..' in filename or filename.startswith('/'):
+#         return "Acceso denegado", 403
+#         
+#     filepath = os.path.join(directory, filename)
+#     if not os.path.exists(filepath):
+#         return f"Archivo no encontrado: {filename}", 404
+#         
+#     if mimetype is None:
+#         # Determinar el tipo MIME basado en la extensión
+#         extension = filename.split('.')[-1].lower() if '.' in filename else ''
+#         mimetypes = {
+#             'jpg': 'image/jpeg',
+#             'jpeg': 'image/jpeg',
+#             'png': 'image/png',
+#             'gif': 'image/gif',
+#             'pdf': 'application/pdf'
+#         }
+#         mimetype = mimetypes.get(extension)
+#     
+#     return send_from_directory(directory, filename, mimetype=mimetype)
 
-# Ruta unificada para servir archivos
-@app.route('/files/<path:filename>')
-def serve_uploaded_file(filename):
-    """Ruta unificada para servir archivos desde diferentes directorios"""
-    # Determinar el directorio correcto basado en el prefijo del archivo
-    if filename.startswith('comprobantes/'):
-        return serve_file('static/comprobantes', filename.replace('comprobantes/', ''))
-    elif filename.startswith('animales/'):
-        return serve_file('static/uploads/animales', filename.replace('animales/', ''))
-    elif filename.startswith('perfiles/'):
-        return serve_file('static/uploads/perfiles', filename.replace('perfiles/', ''))
-    else:
-        return "Tipo de archivo no válido", 400
+# Ruta unificada para servir archivos (COMENTADA para Vercel)
+# @app.route('/files/<path:filename>')
+# def serve_uploaded_file(filename):
+#     """Ruta unificada para servir archivos desde diferentes directorios"""
+#     # Determinar el directorio correcto basado en el prefijo del archivo
+#     if filename.startswith('comprobantes/'):
+#         return serve_file('static/comprobantes', filename.replace('comprobantes/', ''))
+#     elif filename.startswith('animales/'):
+#         return serve_file('static/uploads/animales', filename.replace('animales/', ''))
+#     elif filename.startswith('perfiles/'):
+#         return serve_file('static/uploads/perfiles', filename.replace('perfiles/', ''))
+#     else:
+#         return "Tipo de archivo no válido", 400
 
 @app.route('/')
 def inicio():
@@ -669,6 +675,7 @@ def eliminar_animal(animal_id):
 
 @app.route('/perfil/editar', methods=['GET', 'POST'])
 def editar_perfil():
+    print("Iniciando función editar_perfil")
     if 'username' not in session:
         flash('Debes iniciar sesión primero', 'error')
         return redirect(url_for('login'))
@@ -678,59 +685,81 @@ def editar_perfil():
     try:
         # Obtener información actual del usuario desde la base de datos
         usuario = db_connection.obtener_usuario_por_id(usuario_id)
+        print("Usuario obtenido:", usuario)
         
         if request.method == 'POST':
+            print("Entró al POST de editar_perfil")
             # Procesar formulario de edición de perfil
             nombre = request.form.get('nombre')
             email = request.form.get('email')
             telefono = request.form.get('telefono')
             cargo = request.form.get('cargo')
             direccion = request.form.get('direccion')
-            
+            print("Nombre recibido:", nombre)
+            print("Email recibido:", email)
             # Validaciones básicas
             if not nombre or len(nombre) < 3:
+                print("Validación fallida: nombre")
                 flash('El nombre debe tener al menos 3 caracteres', 'error')
                 return render_template('editar_perfil.html', usuario=usuario)
-                
+            print("Validación de nombre pasada")
             if not email or '@' not in email:
+                print("Validación fallida: email")
                 flash('Ingrese un correo electrónico válido', 'error')
                 return render_template('editar_perfil.html', usuario=usuario)
-            
+            print("Validación de email pasada")
             # Verificar si el correo ya está en uso por otro usuario
             if email != usuario.get('email'):
                 usuario_existente = db_connection.obtener_usuario_por_email(email)
+                print("Verificando email duplicado:", usuario_existente)
                 if usuario_existente and str(usuario_existente.get('id')) != str(usuario_id):
+                    print("Validación fallida: email duplicado")
                     flash('Este correo electrónico ya está en uso', 'error')
                     return render_template('editar_perfil.html', usuario=usuario)
+            print("Validación de email duplicado pasada")
             
             # Manejar carga de imagen de perfil
             foto_perfil = request.files.get('foto_perfil')
+            print("Foto perfil recibida:", foto_perfil)
+            print("Nombre del archivo:", foto_perfil.filename if foto_perfil else "No hay archivo")
             foto_path = None
             
+            print("Evaluando condición:", foto_perfil and foto_perfil.filename)
+            print("foto_perfil existe:", foto_perfil is not None)
+            print("foto_perfil.filename existe:", foto_perfil.filename if foto_perfil else None)
             if foto_perfil and foto_perfil.filename:
+                print("Entrando al bloque de procesamiento de imagen")
+                print("Validando archivo:", foto_perfil.filename)
+                print("Resultado de allowed_file_perfil:", allowed_file_perfil(foto_perfil.filename))
                 if not allowed_file_perfil(foto_perfil.filename):
+                    print("Validación fallida: formato no permitido")
                     flash('Formato de imagen no permitido. Use JPG, PNG o GIF', 'error')
                     return render_template('editar_perfil.html', usuario=usuario)
-                    
+                print("Validación de formato pasada")
+                
                 # Verificar tamaño de la imagen (máximo 5MB)
-                if len(foto_perfil.read()) > 5 * 1024 * 1024:  # 5MB en bytes
+                print("Archivo recibido:", foto_perfil)
+                print("Nombre del archivo:", foto_perfil.filename)
+                file_content = foto_perfil.read()
+                print("Tamaño del archivo:", len(file_content))
+                if len(file_content) > 5 * 1024 * 1024:  # 5MB en bytes
                     foto_perfil.seek(0)  # Reiniciar el puntero del archivo
                     flash('La imagen es demasiado grande. Máximo 5MB', 'error')
                     return render_template('editar_perfil.html', usuario=usuario)
-                
                 foto_perfil.seek(0)  # Reiniciar el puntero del archivo
-                filename = secure_filename(f"{usuario_id}_{foto_perfil.filename}")
-                filepath = os.path.join(app.root_path, UPLOAD_FOLDER_PERFIL, filename)
-                
-                # Crear directorio si no existe
-                os.makedirs(os.path.join(app.root_path, UPLOAD_FOLDER_PERFIL), exist_ok=True)
-                
-                foto_perfil.save(filepath)
-                foto_path = f'/static/uploads/perfiles/{filename}'
-                
-                # Guardar foto en sesión
-                session['foto_perfil'] = foto_path
+                print("Intentando subir imagen a Cloudinary")
+                from src.cloudinary_handler import upload_file
+                cloudinary_url = upload_file(foto_perfil, folder="perfiles")
+                print("Resultado de Cloudinary:", cloudinary_url)
+                if cloudinary_url:
+                    foto_path = cloudinary_url
+                    session['foto_perfil'] = foto_path
+                    print("URL de Cloudinary guardada:", foto_path)
+                else:
+                    flash('Error al subir la imagen a Cloudinary', 'error')
+                    return render_template('editar_perfil.html', usuario=usuario)
             
+            print("Antes de verificar columnas de BD")
             # Verificar si los campos cargo y dirección existen en el usuario
             try:
                 # Actualizar información en la base de datos
@@ -763,23 +792,29 @@ def editar_perfil():
                         app.logger.info("Columna 'direccion' agregada a la tabla usuarios")
                     
                     connection.commit()
+                    print("Verificación de columnas completada")
             except Exception as e:
                 app.logger.error(f"Error al verificar/crear columnas: {e}")
+                print("Error al verificar columnas:", e)
                 # Continuamos con la actualización de todas formas
             
+            print("Antes de actualizar perfil en BD")
             # Actualizar información en la base de datos
             db_connection.actualizar_perfil_usuario(usuario_id, nombre, email, telefono, foto_path, cargo, direccion)
+            print("Después de actualizar perfil en BD")
             
             # Actualizar sesión
             session['nombre'] = nombre
             session['email'] = email
             
             # Registrar en el sistema de auditoría
-            auditoria.registrar_evento(
-                usuario_id=usuario_id,
-                tipo_evento='actualizacion_perfil',
-                descripcion=f'Usuario {nombre} actualizó su perfil'
-            )
+            print("Antes de registrar auditoría")
+            # auditoria.registrar_evento(
+            #     usuario_id=usuario_id,
+            #     tipo_evento='actualizacion_perfil',
+            #     descripcion=f'Usuario {nombre} actualizó su perfil'
+            # )
+            print("Después de registrar auditoría")
             
             flash('Perfil actualizado exitosamente', 'success')
             return redirect(url_for('dashboard'))
@@ -790,6 +825,7 @@ def editar_perfil():
         return render_template('editar_perfil.html', usuario=usuario)
     
     except Exception as e:
+        print("Error capturado en except:", e)
         app.logger.error(f"Error al editar perfil: {e}")
         flash('Ocurrió un error al editar el perfil', 'error')
         return redirect(url_for('dashboard'))
@@ -2315,29 +2351,14 @@ def agregar_ingreso():
         if 'comprobante' in request.files:
             file = request.files['comprobante']
             if file and file.filename:
-                # Generar un nombre único para el archivo para evitar colisiones
-                # Usar timestamp + nombre original
-                nombre_base = secure_filename(file.filename)
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                filename = f"{timestamp}_{nombre_base}"
-                
-                # Asegurarse de que los directorios existen
-                os.makedirs('uploads/comprobantes', exist_ok=True)
-                os.makedirs('static/comprobantes', exist_ok=True)
-                
-                # Guardar el archivo en uploads/comprobantes
-                filepath_uploads = os.path.join('uploads/comprobantes', filename)
-                file.save(filepath_uploads)
-                
-                # Copiar el archivo a static/comprobantes para acceso directo
-                filepath_static = os.path.join('static/comprobantes', filename)
-                import shutil
-                shutil.copy2(filepath_uploads, filepath_static)
-                
-                # Guardar solo el nombre del archivo en la base de datos
-                comprobante = filename
-                
-                app.logger.info(f"Comprobante guardado: {filename} en ambas ubicaciones")
+                # Subir comprobante a Cloudinary
+                cloudinary_url = upload_file(file, folder="comprobantes")
+                if cloudinary_url:
+                    comprobante = cloudinary_url
+                    app.logger.info(f"Comprobante subido a Cloudinary: {cloudinary_url}")
+                else:
+                    flash('Error al subir el comprobante a Cloudinary', 'error')
+                    return redirect(url_for('ingresos'))
         
         db = get_db_connection()
         cursor = db.cursor()
@@ -2372,11 +2393,18 @@ def eliminar_ingreso(id):
         ingreso = cursor.fetchone()
         
         if ingreso and ingreso['comprobante']:
-            try:
-                os.remove(ingreso['comprobante'])
-            except OSError:
-                # Si el archivo no existe o no se puede eliminar, continuamos
-                pass
+            # Si es una URL de Cloudinary, eliminar de Cloudinary
+            if 'cloudinary' in ingreso['comprobante']:
+                public_id = get_public_id_from_url(ingreso['comprobante'])
+                if public_id:
+                    delete_file(public_id)
+            # Si es un archivo local, intentar eliminarlo (para compatibilidad)
+            else:
+                try:
+                    os.remove(ingreso['comprobante'])
+                except OSError:
+                    # Si el archivo no existe o no se puede eliminar, continuamos
+                    pass
         
         cursor.execute("DELETE FROM ingresos WHERE id = %s", (id,))
         db.commit()
@@ -2446,21 +2474,19 @@ def actualizar_ingreso(id):
         if 'comprobante' in request.files:
             file = request.files['comprobante']
             if file and file.filename:
-                # Si hay un comprobante anterior, eliminarlo
-                if comprobante:
-                    try:
-                        os.remove(comprobante)
-                    except OSError:
-                        pass
+                # Si hay un comprobante anterior en Cloudinary, eliminarlo
+                if comprobante and 'cloudinary' in comprobante:
+                    public_id = get_public_id_from_url(comprobante)
+                    if public_id:
+                        delete_file(public_id)
                 
-                # Generar un nombre seguro para el archivo
-                filename = secure_filename(file.filename)
-                # Asegurarse de que el directorio existe
-                os.makedirs('uploads/comprobantes', exist_ok=True)
-                # Guardar el archivo
-                filepath = os.path.join('uploads/comprobantes', filename)
-                file.save(filepath)
-                comprobante = filepath
+                # Subir nuevo comprobante a Cloudinary
+                cloudinary_url = upload_file(file, folder="comprobantes")
+                if cloudinary_url:
+                    comprobante = cloudinary_url
+                else:
+                    flash('Error al subir el comprobante a Cloudinary', 'error')
+                    return redirect(url_for('ingresos'))
         
         # Actualizar el ingreso
         cursor.execute("""
@@ -2575,29 +2601,14 @@ def agregar_gasto():
         if 'comprobante' in request.files:
             file = request.files['comprobante']
             if file and file.filename:
-                # Generar un nombre único para el archivo para evitar colisiones
-                # Usar timestamp + nombre original
-                nombre_base = secure_filename(file.filename)
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                filename = f"{timestamp}_{nombre_base}"
-                
-                # Asegurarse de que los directorios existen
-                os.makedirs('uploads/comprobantes', exist_ok=True)
-                os.makedirs('static/comprobantes', exist_ok=True)
-                
-                # Guardar el archivo en uploads/comprobantes
-                filepath_uploads = os.path.join('uploads/comprobantes', filename)
-                file.save(filepath_uploads)
-                
-                # Copiar el archivo a static/comprobantes para acceso directo
-                filepath_static = os.path.join('static/comprobantes', filename)
-                import shutil
-                shutil.copy2(filepath_uploads, filepath_static)
-                
-                # Guardar solo el nombre del archivo en la base de datos
-                comprobante = filename
-                
-                app.logger.info(f"Comprobante guardado: {filename} en ambas ubicaciones")
+                # Subir comprobante a Cloudinary
+                cloudinary_url = upload_file(file, folder="comprobantes")
+                if cloudinary_url:
+                    comprobante = cloudinary_url
+                    app.logger.info(f"Comprobante subido a Cloudinary: {cloudinary_url}")
+                else:
+                    flash('Error al subir el comprobante a Cloudinary', 'error')
+                    return redirect(url_for('gastos'))
         
         db = get_db_connection()
         cursor = db.cursor()
@@ -2632,11 +2643,18 @@ def eliminar_gasto(id):
         gasto = cursor.fetchone()
         
         if gasto and gasto['comprobante']:
-            try:
-                os.remove(gasto['comprobante'])
-            except OSError:
-                # Si el archivo no existe o no se puede eliminar, continuamos
-                pass
+            # Si es una URL de Cloudinary, eliminar de Cloudinary
+            if 'cloudinary' in gasto['comprobante']:
+                public_id = get_public_id_from_url(gasto['comprobante'])
+                if public_id:
+                    delete_file(public_id)
+            # Si es un archivo local, intentar eliminarlo (para compatibilidad)
+            else:
+                try:
+                    os.remove(gasto['comprobante'])
+                except OSError:
+                    # Si el archivo no existe o no se puede eliminar, continuamos
+                    pass
         
         cursor.execute("DELETE FROM gastos WHERE id = %s", (id,))
         db.commit()
@@ -2706,40 +2724,19 @@ def actualizar_gasto(id):
         if 'comprobante' in request.files:
             file = request.files['comprobante']
             if file and file.filename:
-                # Si hay un comprobante anterior, intentamos eliminarlo
-                if comprobante:
-                    try:
-                        # Eliminar de ambas ubicaciones
-                        uploads_path = os.path.join('uploads/comprobantes', comprobante)
-                        static_path = os.path.join('static/comprobantes', comprobante)
-                        
-                        if os.path.exists(uploads_path):
-                            os.remove(uploads_path)
-                        if os.path.exists(static_path):
-                            os.remove(static_path)
-                    except OSError:
-                        # Si el archivo no existe o no se puede eliminar, continuamos
-                        pass
+                # Si hay un comprobante anterior en Cloudinary, eliminarlo
+                if comprobante and 'cloudinary' in comprobante:
+                    public_id = get_public_id_from_url(comprobante)
+                    if public_id:
+                        delete_file(public_id)
                 
-                # Generar un nombre único para el nuevo archivo
-                nombre_base = secure_filename(file.filename)
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                filename = f"{timestamp}_{nombre_base}"
-                
-                # Asegurarse de que los directorios existen
-                os.makedirs('uploads/comprobantes', exist_ok=True)
-                os.makedirs('static/comprobantes', exist_ok=True)
-                
-                # Guardar el archivo en uploads/comprobantes
-                filepath_uploads = os.path.join('uploads/comprobantes', filename)
-                file.save(filepath_uploads)
-                
-                # Copiar el archivo a static/comprobantes para acceso directo
-                filepath_static = os.path.join('static/comprobantes', filename)
-                shutil.copy2(filepath_uploads, filepath_static)
-                
-                # Actualizar el nombre del comprobante
-                comprobante = filename
+                # Subir nuevo comprobante a Cloudinary
+                cloudinary_url = upload_file(file, folder="comprobantes")
+                if cloudinary_url:
+                    comprobante = cloudinary_url
+                else:
+                    flash('Error al subir el comprobante a Cloudinary', 'error')
+                    return redirect(url_for('gastos'))
         
         # Actualizar el gasto en la base de datos
         cursor.execute("""
