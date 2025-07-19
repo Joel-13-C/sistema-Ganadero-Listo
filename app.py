@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, make_response
+from flask_session import Session
 from src.database import DatabaseConnection, get_db_connection
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -25,6 +26,7 @@ from src.gestacion import registrar_gestacion, obtener_gestaciones, actualizar_e
 from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
+from src.jwt_auth import create_token, jwt_login_required
 
 import pg8000
 
@@ -36,8 +38,16 @@ global db_connection
 db_connection = None
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.config['SECRET_KEY'] = os.urandom(24)  # Clave secreta para sesiones
+# Usar una clave secreta fija para Vercel (en producción debería ser una variable de entorno)
+app.config['SECRET_KEY'] = 'tu_clave_secreta_fija_aqui_123456789'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+
+# Configuración para sesiones en Vercel
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+
+# Inicializar Flask-Session
+Session(app)
 
 # Función para validar archivos de imagen
 def allowed_file(filename):
@@ -127,6 +137,11 @@ def login():
                 session['username'] = username
                 # user es una tupla, el ID está en la posición 0
                 session['usuario_id'] = user[0]
+                
+                # Generar token JWT para Vercel
+                token = create_token(user[0], username)
+                session['jwt_token'] = token
+                
                 app.logger.info(f"Usuario {username} ha iniciado sesión correctamente")
                 return redirect(url_for('dashboard'))
             else:
@@ -174,14 +189,12 @@ def registro():
     
     return render_template('registro.html')
 
-# Definir el decorador login_required
+# Definir el decorador login_required híbrido (sesiones + JWT)
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            flash('Por favor inicie sesión para acceder a esta página', 'warning')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
+        # Usar el decorador JWT que maneja tanto sesiones como tokens
+        return jwt_login_required(f)(*args, **kwargs)
     return decorated_function
 
 @app.route('/dashboard')

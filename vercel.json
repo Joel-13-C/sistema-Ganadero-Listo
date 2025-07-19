@@ -13,6 +13,27 @@
     }
   ],
   "env": {
-    "PYTHONPATH": "."
-  }
+    "PYTHONPATH": ".",
+    "FLASK_ENV": "production",
+    "SECRET_KEY": "tu_clave_secreta_fija_aqui_123456789",
+    "JWT_SECRET_KEY": "tu_clave_jwt_secreta_aqui_123456789",
+    "SESSION_TYPE": "filesystem",
+    "SESSION_FILE_DIR": "/tmp"
+  },
+  "functions": {
+    "vercel_app.py": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
 }
