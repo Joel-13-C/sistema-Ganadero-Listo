@@ -4,7 +4,7 @@ from io import BytesIO
 import datetime
 from datetime import datetime, timedelta
 from src.database import get_db_connection
-import psycopg2.extras
+
 import pg8000
 
 def dictfetchall(cursor):

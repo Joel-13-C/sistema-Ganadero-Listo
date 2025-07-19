@@ -25,7 +25,7 @@ from src.gestacion import registrar_gestacion, obtener_gestaciones, actualizar_e
 from datetime import date
 from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
-import psycopg2.extras
+
 import pg8000
 from xhtml2pdf import pisa
 

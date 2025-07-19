@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from flask import request, session
 import logging
 from datetime import datetime
-import psycopg2.extras
 import pg8000
 
 def dictfetchall(cursor):

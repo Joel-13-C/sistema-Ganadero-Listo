@@ -669,7 +669,7 @@ class DatabaseConnection:
                 logger.info(f"Animal ID {animal_id} actualizado exitosamente")
                 return True
                 
-        except psycopg2.Error as err:
+        except Exception as err:
             logger.error(f"Error al actualizar animal: {err}")
             if connection and not connection.closed:
                 connection.rollback()
@@ -682,9 +682,9 @@ def get_db_connection():
     """
     try:
         db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
-        connection = psycopg2.connect(db_url)
+        connection = pg8000.connect(db_url)
         logger.info("Conexión a PostgreSQL establecida exitosamente")
         return connection
-    except psycopg2.Error as err:
+    except Exception as err:
         logger.error(f"Error al conectar a PostgreSQL: {err}")
         raise Exception(f"Error de conexión a PostgreSQL: {err}")
