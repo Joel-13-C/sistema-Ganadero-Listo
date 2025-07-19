@@ -27,7 +27,6 @@ from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
 
 import pg8000
-from xhtml2pdf import pisa
 
 # Configuración para Vercel (sin carpetas locales)
 # UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
@@ -3233,8 +3232,8 @@ def descargar_reporte_pdf():
             'subtitulo': f"Reporte Financiero - {nombre_mes} {anio}"
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/reporte_financiero.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/reporte_financiero.html', context, f'reporte_financiero_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         flash(f'Error al generar el reporte PDF: {str(e)}', 'danger')
@@ -4579,8 +4578,8 @@ def generar_reporte_pdf(tipo):
             'subtitulo': "Reporte de " + ("Todos los Animales" if tipo == 'todos' else tipo.capitalize())
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/reporte_animales.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/reporte_animales.html', context, f'reporte_animales_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         app.logger.error(f'Error al generar reporte PDF: {str(e)}')
@@ -4613,8 +4612,8 @@ def generar_reporte_gestacion():
             'subtitulo': "Reporte de Gestaciones"
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/reporte_gestacion.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/reporte_gestacion.html', context, f'reporte_gestacion_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         app.logger.error(f'Error al generar reporte de gestación: {str(e)}')
@@ -4662,8 +4661,8 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
             'fecha_fin': fecha_fin
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/reporte_desparasitacion.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/reporte_desparasitacion.html', context, f'reporte_desparasitacion_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         app.logger.error(f'Error al generar reporte de desparasitación: {str(e)}')
@@ -4723,8 +4722,8 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
             'fecha_fin': fecha_fin
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/reporte_vitaminizacion.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/reporte_vitaminizacion.html', context, f'reporte_vitaminizacion_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         app.logger.error(f'Error al generar reporte de vitaminización: {str(e)}')
@@ -4780,8 +4779,8 @@ def generar_certificado_aftosa(certificado_id):
             'titulo': "CERTIFICADO DE VACUNACIÓN - FIEBRE AFTOSA"
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/certificado_aftosa.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/certificado_aftosa.html', context, f'certificado_aftosa_{certificado_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         app.logger.error(f'Error al generar certificado de aftosa: {str(e)}')
@@ -4828,8 +4827,8 @@ def generar_pdf_carbunco(registro_id):
             'titulo': "CERTIFICADO DE VACUNACIÓN CONTRA CARBUNCO"
         }
         
-        # Generar PDF usando xhtml2pdf
-        return render_pdf_from_template('reportes_pdf/certificado_carbunco.html', context)
+        # Generar reporte HTML
+        return render_html_report('reportes_pdf/certificado_carbunco.html', context, f'certificado_carbunco_{registro_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         
     except Exception as e:
         app.logger.error(f'Error al generar certificado de carbunco: {str(e)}')
@@ -4905,15 +4904,19 @@ def vista_registro_leche():
 
 # Esta ruta ha sido reemplazada por el blueprint registro_leche_bp
 
-def render_pdf_from_template(template_name, context):
-    html = render_template(template_name, **context)
-    response = make_response()
-    pdf = pisa.CreatePDF(html, dest=response)
-    if not pdf.err:
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = 'inline; filename=reporte.pdf'
+def render_html_report(template_name, context, filename):
+    """
+    Renderiza un template HTML y retorna una respuesta con el HTML como archivo descargable
+    """
+    try:
+        html_content = render_template(template_name, **context)
+        response = make_response(html_content)
+        response.headers['Content-Type'] = 'text/html'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}.html'
         return response
-    return 'Error al generar PDF', 500
+    except Exception as e:
+        app.logger.error(f"Error al generar reporte HTML: {e}")
+        return 'Error al generar reporte', 500
 
 if __name__ == '__main__':
     init_db()
