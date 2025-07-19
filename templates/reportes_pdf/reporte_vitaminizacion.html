@@ -1,0 +1,48 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block content %}
+<div class="report-content">
+    <h2>{{ subtitulo }}</h2>
+    
+    {% if fecha_inicio and fecha_fin %}
+    <p><strong>Período:</strong> {{ fecha_inicio }} - {{ fecha_fin }}</p>
+    {% endif %}
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>N° Arete</th>
+                <th>Nombre</th>
+                <th>Tipo Animal</th>
+                <th>Producto</th>
+                <th>Dosis</th>
+                <th>Próxima Aplicación</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for vitaminizacion in vitaminizaciones %}
+            <tr>
+                <td>{{ vitaminizacion.fecha_aplicacion.strftime('%d/%m/%Y') }}</td>
+                <td>{{ vitaminizacion.numero_arete }}</td>
+                <td>{{ vitaminizacion.nombre }}</td>
+                <td>{{ vitaminizacion.condicion }}</td>
+                <td>{{ vitaminizacion.producto }}</td>
+                <td>{{ vitaminizacion.dosis or '-' }}</td>
+                <td>
+                    {% if vitaminizacion.fecha_proxima %}
+                        {{ vitaminizacion.fecha_proxima.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="summary">
+        <p><strong>Total de vitaminizaciones:</strong> {{ vitaminizaciones|length }}</p>
+    </div>
+</div>
+{% endblock %} 

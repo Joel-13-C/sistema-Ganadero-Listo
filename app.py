@@ -4684,22 +4684,7 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
         app.logger.error(f'Error al generar reporte de desparasitación: {str(e)}')
         flash('Error al generar el reporte PDF', 'error')
         return redirect(url_for('desparasitacion'))
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-        
 
-        app.logger.error(f'Error al generar reporte PDF de desparasitaciones: {str(e)}')
-        app.logger.error('Traceback completo:', exc_info=True)
-        flash(f'Error al generar el reporte PDF: {str(e)}', 'error')
-        return redirect(url_for('desparasitacion'))
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
 
 @app.route('/generar_reporte_vitaminizacion')
 @app.route('/generar_reporte_vitaminizacion/<fecha_inicio>/<fecha_fin>')
@@ -4751,28 +4736,9 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
         # Generar PDF usando xhtml2pdf
         return render_pdf_from_template('reportes_pdf/reporte_vitaminizacion.html', context)
         
-        # Crear y estilizar la tabla
-
-        
-        # Generar PDF
-        app.logger.info('Generando el documento PDF de vitaminización...')
-        doc.build(elements, onFirstPage=draw_background, onLaterPages=draw_background)
-        
-        # Preparar descarga
-        buffer.seek(0)
-        response = send_file(
-            buffer,
-            download_name=f'reporte_vitaminizacion_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
-            mimetype='application/pdf'
-        )
-        
-        app.logger.info('PDF de vitaminización generado exitosamente')
-        return response
-        
     except Exception as e:
-        app.logger.error(f'Error al generar reporte PDF de vitaminización: {str(e)}')
-        app.logger.error('Traceback completo:', exc_info=True)
-        flash(f'Error al generar el reporte PDF: {str(e)}', 'error')
+        app.logger.error(f'Error al generar reporte de vitaminización: {str(e)}')
+        flash('Error al generar el reporte PDF', 'error')
         return redirect(url_for('vitaminizacion'))
     finally:
         if cursor:
