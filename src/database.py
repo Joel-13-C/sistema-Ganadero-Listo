@@ -29,7 +29,8 @@ class DatabaseConnection:
                 port=parsed.port or 5432,
                 user=parsed.username,
                 password=parsed.password,
-                database=parsed.path[1:] if parsed.path else 'ganadero_anwt'
+                database=parsed.path[1:] if parsed.path else 'ganadero_anwt',
+                ssl_context=True
             )
             
             logger.info("Conexión a PostgreSQL establecida exitosamente")
@@ -51,7 +52,8 @@ class DatabaseConnection:
                     port=parsed.port or 5432,
                     user=parsed.username,
                     password=parsed.password,
-                    database=parsed.path[1:] if parsed.path else 'ganadero_anwt'
+                    database=parsed.path[1:] if parsed.path else 'ganadero_anwt',
+                    ssl_context=True
                 )
             return self.connection
         except Exception as err:
@@ -682,7 +684,21 @@ def get_db_connection():
     """
     try:
         db_url = "postgresql://ganadero_anwt_user:rOsqRSS6jlrJ6UiEQzj7HM2G5CAb0eBb@dpg-d1tg58idbo4c73dieh30-a.oregon-postgres.render.com/ganadero_anwt"
-        connection = pg8000.connect(db_url)
+        
+        # Parsear la URL de conexión
+        from urllib.parse import urlparse
+        parsed = urlparse(db_url)
+        
+        # Establecer la conexión con pg8000 usando parámetros separados
+        connection = pg8000.Connection(
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            user=parsed.username,
+            password=parsed.password,
+            database=parsed.path[1:] if parsed.path else 'ganadero_anwt',
+            ssl_context=True
+        )
+        
         logger.info("Conexión a PostgreSQL establecida exitosamente")
         return connection
     except Exception as err:
