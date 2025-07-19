@@ -1,0 +1,45 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block content %}
+<div class="report-content">
+    <h2>{{ subtitulo }}</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>N° Arete</th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Fecha Monta</th>
+                <th>Fecha Probable Parto</th>
+                <th>Días Restantes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for gestacion in gestaciones %}
+            <tr>
+                <td>{{ gestacion.numero_arete }}</td>
+                <td>{{ gestacion.nombre }}</td>
+                <td>{{ gestacion.estado }}</td>
+                <td>{{ gestacion.fecha_monta.strftime('%d/%m/%Y') }}</td>
+                <td>{{ gestacion.fecha_probable_parto.strftime('%d/%m/%Y') }}</td>
+                <td>
+                    {% if gestacion.estado == 'En Gestación' %}
+                        {% set dias = (gestacion.fecha_probable_parto - today).days %}
+                        {{ dias if dias > 0 else 0 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="summary">
+        <p><strong>Total de gestaciones:</strong> {{ gestaciones|length }}</p>
+        <p><strong>En gestación:</strong> {{ gestaciones|selectattr('estado', 'equalto', 'En Gestación')|list|length }}</p>
+        <p><strong>Paridas:</strong> {{ gestaciones|selectattr('estado', 'equalto', 'Parida')|list|length }}</p>
+    </div>
+</div>
+{% endblock %} 

@@ -1,95 +1,81 @@
 {% extends "reportes_pdf/base_reporte.html" %}
 
-{% block contenido %}
-<h2>Reporte Financiero - {{ periodo }}</h2>
-
-<div class="resumen">
-    <p>Total de ingresos: <span class="total">${{ total_ingresos|round(2) }}</span></p>
-    <p>Total de gastos: <span class="total">${{ total_gastos|round(2) }}</span></p>
-    <p>Balance: <span class="total" style="color: {% if balance >= 0 %}green{% else %}red{% endif %};">${{ balance|round(2) }}</span></p>
+{% block content %}
+<div class="report-content">
+    <h2>{{ subtitulo }}</h2>
+    
+    <div class="summary-section">
+        <h3>Resumen General</h3>
+        <table class="summary-table">
+            <tr>
+                <th>Concepto</th>
+                <th>Monto (MXN)</th>
+            </tr>
+            <tr>
+                <td>Total Ingresos</td>
+                <td>${{ "%.2f"|format(total_ingresos) }}</td>
+            </tr>
+            <tr>
+                <td>Total Gastos</td>
+                <td>${{ "%.2f"|format(total_gastos) }}</td>
+            </tr>
+            <tr class="balance-row">
+                <td><strong>Balance</strong></td>
+                <td><strong>${{ "%.2f"|format(balance) }}</strong></td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="ingresos-section">
+        <h3>Ingresos por Categoría - {{ nombre_mes }} {{ año }}</h3>
+        {% if ingresos_por_categoria %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Categoría</th>
+                        <th>Monto (MXN)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ingreso in ingresos_por_categoria %}
+                        {% if ingreso.total > 0 %}
+                        <tr>
+                            <td>{{ ingreso.categoria }}</td>
+                            <td>${{ "%.2f"|format(ingreso.total) }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No hay ingresos registrados para este período.</p>
+        {% endif %}
+    </div>
+    
+    <div class="gastos-section">
+        <h3>Gastos por Categoría - {{ nombre_mes }} {{ año }}</h3>
+        {% if gastos_por_categoria %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Categoría</th>
+                        <th>Monto (MXN)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gasto in gastos_por_categoria %}
+                        {% if gasto.total > 0 %}
+                        <tr>
+                            <td>{{ gasto.categoria }}</td>
+                            <td>${{ "%.2f"|format(gasto.total) }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No hay gastos registrados para este período.</p>
+        {% endif %}
+    </div>
 </div>
-
-<h3>Ingresos por Categoría</h3>
-<table>
-    <thead>
-        <tr>
-            <th>Categoría</th>
-            <th>Monto</th>
-            <th>Porcentaje</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for categoria in ingresos_por_categoria %}
-        <tr>
-            <td>{{ categoria.nombre }}</td>
-            <td>${{ categoria.monto|round(2) }}</td>
-            <td>{{ categoria.porcentaje|round(2) }}%</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<h3>Gastos por Categoría</h3>
-<table>
-    <thead>
-        <tr>
-            <th>Categoría</th>
-            <th>Monto</th>
-            <th>Porcentaje</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for categoria in gastos_por_categoria %}
-        <tr>
-            <td>{{ categoria.nombre }}</td>
-            <td>${{ categoria.monto|round(2) }}</td>
-            <td>{{ categoria.porcentaje|round(2) }}%</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<h3>Detalle de Ingresos</h3>
-<table>
-    <thead>
-        <tr>
-            <th>Fecha</th>
-            <th>Concepto</th>
-            <th>Categoría</th>
-            <th>Monto</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for ingreso in ingresos %}
-        <tr>
-            <td>{{ ingreso.fecha }}</td>
-            <td>{{ ingreso.concepto }}</td>
-            <td>{{ ingreso.categoria }}</td>
-            <td>${{ ingreso.monto|round(2) }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<h3>Detalle de Gastos</h3>
-<table>
-    <thead>
-        <tr>
-            <th>Fecha</th>
-            <th>Concepto</th>
-            <th>Categoría</th>
-            <th>Monto</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for gasto in gastos %}
-        <tr>
-            <td>{{ gasto.fecha }}</td>
-            <td>{{ gasto.concepto }}</td>
-            <td>{{ gasto.categoria }}</td>
-            <td>${{ gasto.monto|round(2) }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
 {% endblock %}

@@ -19,6 +19,16 @@ def html_to_pdf(html_content):
         return result.getvalue()
     return None
 
+def render_pdf_from_template(template_name, context):
+    html = render_template(template_name, **context)
+    response = make_response()
+    pdf = pisa.CreatePDF(html, dest=response)
+    if not pdf.err:
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=reporte.pdf'
+        return response
+    return 'Error al generar PDF', 500
+
 # Función para generar reporte de animales
 def generar_reporte_animales(categoria_animal, estado_animal):
     try:

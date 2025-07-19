@@ -1,0 +1,86 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block content %}
+<div class="certificate-content">
+    <h2>{{ titulo }}</h2>
+    
+    <div class="certificate-info">
+        <h3>INFORMACIÓN DEL CERTIFICADO</h3>
+        <table class="info-table">
+            <tr>
+                <td><strong>N° Registro:</strong></td>
+                <td>{{ registro.id }}</td>
+            </tr>
+            <tr>
+                <td><strong>Fecha:</strong></td>
+                <td>{{ registro.fecha_aplicacion.strftime('%d/%m/%Y') }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="vaccination-details">
+        <h3>DETALLES DE LA VACUNACIÓN</h3>
+        <table class="info-table">
+            <tr>
+                <td><strong>Producto:</strong></td>
+                <td>{{ registro.producto }}</td>
+            </tr>
+            <tr>
+                <td><strong>Lote:</strong></td>
+                <td>{{ registro.lote }}</td>
+            </tr>
+            <tr>
+                <td><strong>Vacunador:</strong></td>
+                <td>{{ registro.vacunador }}</td>
+            </tr>
+            <tr>
+                <td><strong>Próxima Aplicación:</strong></td>
+                <td>{{ registro.proxima_aplicacion.strftime('%d/%m/%Y') }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="animal-info">
+        <h3>INFORMACIÓN DEL ANIMAL</h3>
+        <table class="info-table">
+            <tr>
+                <td><strong>N° Arete:</strong></td>
+                <td>{{ registro.numero_arete }}</td>
+            </tr>
+            <tr>
+                <td><strong>Nombre:</strong></td>
+                <td>{{ registro.nombre }}</td>
+            </tr>
+            <tr>
+                <td><strong>Condición:</strong></td>
+                <td>{{ registro.condicion }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="signatures">
+        <table class="signature-table">
+            <tr>
+                <td>_________________________</td>
+                <td>_________________________</td>
+            </tr>
+            <tr>
+                <td><strong>Firma y Sello del Propietario</strong></td>
+                <td><strong>Firma y Sello del Vacunador</strong></td>
+            </tr>
+            <tr>
+                <td>_________________</td>
+                <td>{{ registro.vacunador }}</td>
+            </tr>
+            <tr>
+                <td>C.I.: ____________</td>
+                <td>C.I.: ____________</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="footer-note">
+        <p><em>Este certificado es un documento oficial. La falsificación o alteración de este documento está sujeta a sanciones legales.</em></p>
+    </div>
+</div>
+{% endblock %} 

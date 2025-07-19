@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, make_response
 from src.database import DatabaseConnection, get_db_connection
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -7,13 +7,7 @@ from src.alarmas import SistemaAlarmas
 from src.chatbot import GanaderiaChatbot
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfgen import canvas
+
 from dateutil.relativedelta import relativedelta
 import os
 import re
@@ -33,6 +27,7 @@ from src.routes.registro_leche_routes import registro_leche_bp
 from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_url
 import psycopg2.extras
 import pg8000
+from xhtml2pdf import pisa
 
 # Configuración para Vercel (sin carpetas locales)
 # UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
@@ -3224,120 +3219,22 @@ def descargar_reporte_pdf():
         total_gastos = sum(float(gasto['total']) for gasto in gastos_por_categoria)
         balance = total_ingresos - total_gastos
         
-        # Crear un buffer para el PDF
-        buffer = BytesIO()
+        # Preparar contexto para la plantilla
+        context = {
+            'nombre_mes': nombre_mes,
+            'año': año,
+            'total_ingresos': total_ingresos,
+            'total_gastos': total_gastos,
+            'balance': balance,
+            'ingresos_por_categoria': ingresos_por_categoria,
+            'gastos_por_categoria': gastos_por_categoria,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "SISTEMA GANADERO FINCA ABIGAIL",
+            'subtitulo': f"Reporte Financiero - {nombre_mes} {año}"
+        }
         
-        # Crear el documento PDF
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        elements = []
-        
-        # Estilos
-        styles = getSampleStyleSheet()
-        title_style = styles['Heading1']
-        subtitle_style = styles['Heading2']
-        normal_style = styles['Normal']
-        
-        # Título del reporte
-        elements.append(Paragraph(f"Reporte Financiero - {nombre_mes} {año}", title_style))
-        elements.append(Spacer(1, 0.25*inch))
-        
-        # Resumen general
-        elements.append(Paragraph("Resumen General", subtitle_style))
-        resumen_data = [
-            ["Concepto", "Monto (MXN)"],
-            ["Total Ingresos", f"${total_ingresos:,.2f}"],
-            ["Total Gastos", f"${total_gastos:,.2f}"],
-            ["Balance", f"${balance:,.2f}"]
-        ]
-        
-        resumen_table = Table(resumen_data, colWidths=[3*inch, 2*inch])
-        resumen_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (1, 0), colors.lightblue),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (1, 0), 'CENTER'),
-            ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (1, 0), 12),
-            ('BACKGROUND', (0, -1), (1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-        ]))
-        elements.append(resumen_table)
-        elements.append(Spacer(1, 0.5*inch))
-        
-        # Ingresos por categoría
-        elements.append(Paragraph(f"Ingresos por Categoría - {nombre_mes} {año}", subtitle_style))
-        
-        if ingresos_por_categoria:
-            ingresos_data = [["Categoría", "Monto (MXN)"]]
-            for ingreso in ingresos_por_categoria:
-                if float(ingreso['total']) > 0:  # Solo incluir categorías con montos mayores a cero
-                    ingresos_data.append([ingreso['categoria'], f"${float(ingreso['total']):,.2f}"])
-            
-            if len(ingresos_data) > 1:  # Si hay datos para mostrar
-                ingresos_table = Table(ingresos_data, colWidths=[3.5*inch, 1.5*inch])
-                ingresos_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (1, 0), colors.lightgreen),
-                    ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (1, 0), 'CENTER'),
-                    ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (1, 0), 12),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-                ]))
-                elements.append(ingresos_table)
-            else:
-                elements.append(Paragraph("No hay ingresos registrados para este período.", normal_style))
-        else:
-            elements.append(Paragraph("No hay ingresos registrados para este período.", normal_style))
-        
-        elements.append(Spacer(1, 0.5*inch))
-        
-        # Gastos por categoría
-        elements.append(Paragraph(f"Gastos por Categoría - {nombre_mes} {año}", subtitle_style))
-        
-        if gastos_por_categoria:
-            gastos_data = [["Categoría", "Monto (MXN)"]]
-            for gasto in gastos_por_categoria:
-                if float(gasto['total']) > 0:  # Solo incluir categorías con montos mayores a cero
-                    gastos_data.append([gasto['categoria'], f"${float(gasto['total']):,.2f}"])
-            
-            if len(gastos_data) > 1:  # Si hay datos para mostrar
-                gastos_table = Table(gastos_data, colWidths=[3.5*inch, 1.5*inch])
-                gastos_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (1, 0), colors.salmon),
-                    ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (1, 0), 'CENTER'),
-                    ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (1, 0), 12),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-                ]))
-                elements.append(gastos_table)
-            else:
-                elements.append(Paragraph("No hay gastos registrados para este período.", normal_style))
-        else:
-            elements.append(Paragraph("No hay gastos registrados para este período.", normal_style))
-        
-        # Construir el PDF
-        doc.build(elements, onFirstPage=add_page_number, onLaterPages=add_page_number)
-        
-        # Preparar la respuesta
-        buffer.seek(0)
-        
-        # Cerrar la conexión a la base de datos
-        if 'db' in locals() and db:
-            db.close()
-        
-        # Devolver el PDF como respuesta para descargar
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=f"reporte_financiero_{nombre_mes.lower()}_{año}.pdf",
-            mimetype='application/pdf'
-        )
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/reporte_financiero.html', context)
         
     except Exception as e:
         flash(f'Error al generar el reporte PDF: {str(e)}', 'danger')
@@ -4639,8 +4536,6 @@ def equipos():
 @app.route('/generar_reporte_pdf/<tipo>')
 @login_required
 def generar_reporte_pdf(tipo):
-    conn = None
-    cursor = None
     try:
         app.logger.info(f'Iniciando generación de reporte PDF para tipo: {tipo}')
         
@@ -4675,165 +4570,27 @@ def generar_reporte_pdf(tipo):
             
         app.logger.info(f'Obtenidos {len(animales)} animales para el reporte')
         
-        # Configurar el documento PDF con fondo personalizado
-        buffer = BytesIO()
+        # Preparar contexto para la plantilla
+        context = {
+            'animales': animales,
+            'tipo': tipo,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "SISTEMA GANADERO FINCA ABIGAIL",
+            'subtitulo': "Reporte de " + ("Todos los Animales" if tipo == 'todos' else tipo.capitalize())
+        }
         
-        def draw_background(canvas, doc):
-            try:
-                # Dibujar el logo como marca de agua
-                logo_path = os.path.join('static', 'images', 'logo.png')
-                if os.path.exists(logo_path):
-                    # Guardar el estado actual del canvas
-                    canvas.saveState()
-                    
-                    # Configurar transparencia (0.15 = 15% opacidad)
-                    canvas.setFillAlpha(0.15)
-                    canvas.setStrokeAlpha(0.15)
-                    
-                    # Reducir tamaño de la imagen para marca de agua
-                    img_width = 180  # ancho deseado en puntos
-                    img_height = 180  # alto deseado en puntos
-                    
-                    # Calcular posición para centrar la imagen
-                    x = (doc.pagesize[0] - img_width) / 2
-                    y = doc.pagesize[1] - 180  # Ajustar posición vertical
-                    
-                    # Dibujar la imagen como marca de agua
-                    canvas.drawImage(logo_path, x, y, 
-                                   width=img_width, height=img_height, 
-                                   mask='auto',
-                                   preserveAspectRatio=True)
-                    
-                    # Restaurar el estado original del canvas
-                    canvas.restoreState()
-                else:
-                    app.logger.error(f'No se encontró el logo en: {logo_path}')
-            except Exception as e:
-                app.logger.error(f'Error al dibujar el logo: {str(e)}')
-            
-            # Agregar línea decorativa en la parte superior
-            canvas.setStrokeColor(colors.darkgreen)
-            canvas.setLineWidth(2)
-            canvas.line(doc.leftMargin, doc.pagesize[1] - 50,
-                      doc.pagesize[0] - doc.rightMargin, doc.pagesize[1] - 50)
-            
-            # Agregar pie de página con estilo mejorado
-            canvas.setFont('Helvetica-Bold', 9)
-            canvas.setFillColor(colors.darkgreen)
-            
-            # Línea superior del pie de página
-            canvas.setStrokeColor(colors.darkgreen)
-            canvas.setLineWidth(1)
-            canvas.line(doc.leftMargin, doc.bottomMargin, 
-                      doc.pagesize[0] - doc.rightMargin, doc.bottomMargin)
-            
-            # Texto del pie de página
-            canvas.drawString(doc.leftMargin, doc.bottomMargin - 15, 
-                            f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-            
-            # Número de página
-            page_num = canvas.getPageNumber()
-            text = f"Página {page_num}"
-            text_width = canvas.stringWidth(text, 'Helvetica-Bold', 9)
-            canvas.drawString(doc.pagesize[0] - doc.rightMargin - text_width, 
-                            doc.bottomMargin - 15, text)
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/reporte_animales.html', context)
         
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=50,
-            leftMargin=50,
-            topMargin=80,  # Ajustar margen superior ya que el logo es marca de agua
-            bottomMargin=50
-        )
-        
-        # Preparar estilos
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        
-        # Elementos del PDF
-        elements = []
-        
-        # Título principal
-        elements.append(Paragraph("SISTEMA GANADERO FINCA ABIGAIL", title_style))
-        elements.append(Spacer(1, 20))
-        
-        # Subtítulo del reporte
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Heading2'],
-            fontSize=18,
-            spaceAfter=20,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        subtitulo_texto = "Reporte de " + ("Todos los Animales" if tipo == 'todos' else tipo.capitalize())
-        elements.append(Paragraph(subtitulo_texto, subtitle_style))
-        elements.append(Spacer(1, 20))
-        
-        # Encabezados de la tabla
-        headers = ["Número de Arete", "Nombre", "Raza", "Condición", "Sexo"]
-        data = [headers]
-        
-        # Datos de la tabla
-        for animal in animales:
-            row = [
-                str(animal['numero_arete']),
-                str(animal['nombre']),
-                str(animal['raza']),
-                str(animal['condicion']),
-                str(animal['sexo'])
-            ]
-            data.append(row)
-        
-        # Crear y estilizar la tabla
-        table = Table(data, colWidths=[doc.width/5.0]*5)
-        table.setStyle(TableStyle([
-            # Estilo del encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            # Estilo del contenido
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ROWHEIGHT', (0, 0), (-1, -1), 30)
-        ]))
-        
-        elements.append(table)
-        elements.append(Spacer(1, 20))
-        
-        # Agregar pie de página con fecha
-        fecha_generacion = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        pie_pagina = Paragraph(
-            f"Reporte generado el: {fecha_generacion}",
-            styles['Normal']
-        )
-        elements.append(pie_pagina)
-        
-        # Construir el PDF con el fondo personalizado
-        app.logger.info('Generando el documento PDF...')
-        doc.build(elements, onFirstPage=draw_background, onLaterPages=draw_background)
-        
-        # Preparar para descarga
-        buffer.seek(0)
-        response = send_file(
-            buffer,
-            download_name=f'reporte_animales_{tipo}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
-            mimetype='application/pdf'
-        )
+    except Exception as e:
+        app.logger.error(f'Error al generar reporte PDF: {str(e)}')
+        flash('Error al generar el reporte PDF', 'error')
+        return redirect(url_for('animales'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
         
         app.logger.info('PDF generado exitosamente')
         return response
@@ -4863,186 +4620,20 @@ def generar_reporte_gestacion():
             
         app.logger.info(f'Obtenidas {len(gestaciones)} gestaciones para el reporte')
         
-        # Configurar el documento PDF con fondo personalizado
-        buffer = BytesIO()
+        # Preparar contexto para la plantilla
+        context = {
+            'gestaciones': gestaciones,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "SISTEMA GANADERO FINCA ABIGAIL",
+            'subtitulo': "Reporte de Gestaciones"
+        }
         
-        def draw_background(canvas, doc):
-            try:
-                # Dibujar el logo como marca de agua
-                logo_path = os.path.join('static', 'images', 'logo.png')
-                if os.path.exists(logo_path):
-                    # Guardar el estado actual del canvas
-                    canvas.saveState()
-                    
-                    # Configurar transparencia (0.15 = 15% opacidad)
-                    canvas.setFillAlpha(0.15)
-                    canvas.setStrokeAlpha(0.15)
-                    
-                    # Reducir tamaño de la imagen para marca de agua
-                    img_width = 180  # ancho deseado en puntos
-                    img_height = 180  # alto deseado en puntos
-                    
-                    # Calcular posición para centrar la imagen
-                    x = (doc.pagesize[0] - img_width) / 2
-                    y = doc.pagesize[1] - 180  # Ajustar posición vertical
-                    
-                    # Dibujar la imagen como marca de agua
-                    canvas.drawImage(logo_path, x, y, 
-                                   width=img_width, height=img_height, 
-                                   mask='auto',
-                                   preserveAspectRatio=True)
-                    
-                    # Restaurar el estado original del canvas
-                    canvas.restoreState()
-                else:
-                    app.logger.error(f'No se encontró el logo en: {logo_path}')
-            except Exception as e:
-                app.logger.error(f'Error al dibujar el logo: {str(e)}')
-            
-            # Agregar línea decorativa en la parte superior
-            canvas.setStrokeColor(colors.darkgreen)
-            canvas.setLineWidth(2)
-            canvas.line(doc.leftMargin, doc.pagesize[1] - 50,
-                      doc.pagesize[0] - doc.rightMargin, doc.pagesize[1] - 50)
-            
-            # Agregar pie de página con estilo mejorado
-            canvas.setFont('Helvetica-Bold', 9)
-            canvas.setFillColor(colors.darkgreen)
-            
-            # Línea superior del pie de página
-            canvas.setStrokeColor(colors.darkgreen)
-            canvas.setLineWidth(1)
-            canvas.line(doc.leftMargin, doc.bottomMargin, 
-                      doc.pagesize[0] - doc.rightMargin, doc.bottomMargin)
-            
-            # Texto del pie de página
-            canvas.drawString(doc.leftMargin, doc.bottomMargin - 15, 
-                            f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-            
-            # Número de página
-            page_num = canvas.getPageNumber()
-            text = f"Página {page_num}"
-            text_width = canvas.stringWidth(text, 'Helvetica-Bold', 9)
-            canvas.drawString(doc.pagesize[0] - doc.rightMargin - text_width, 
-                            doc.bottomMargin - 15, text)
-        
-        # Usar orientación horizontal (landscape)
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(letter),
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=60,
-            bottomMargin=40
-        )
-        
-        # Preparar estilos
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        
-        # Elementos del PDF
-        elements = []
-        
-        # Título principal
-        elements.append(Paragraph("SISTEMA GANADERO FINCA ABIGAIL", title_style))
-        elements.append(Spacer(1, 20))
-        
-        # Subtítulo del reporte
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Heading2'],
-            fontSize=18,
-            spaceAfter=20,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        elements.append(Paragraph("Reporte de Gestaciones", subtitle_style))
-        elements.append(Spacer(1, 20))
-        
-        # Encabezados de la tabla
-        headers = [
-            "N° Arete", 
-            "Nombre", 
-            "Estado",
-            "Fecha Monta",
-            "Fecha Probable Parto",
-            "Días Restantes"
-        ]
-        data = [headers]
-        
-        # Datos de la tabla
-        for g in gestaciones:
-            # Usar la fecha probable de parto almacenada en la base de datos
-            fecha_probable = g['fecha_probable_parto']
-            dias_restantes = (fecha_probable - date.today()).days if g['estado'] == 'En Gestación' else 0
-            
-            row = [
-                str(g['numero_arete']),
-                str(g['nombre']),
-                str(g['estado']),
-                g['fecha_monta'].strftime('%d/%m/%Y'),
-                fecha_probable.strftime('%d/%m/%Y'),
-                str(max(0, dias_restantes)) if g['estado'] == 'En Gestación' else '-'
-            ]
-            data.append(row)
-        
-        # Crear y estilizar la tabla
-        # Ajustar anchos de columna para formato horizontal
-        col_widths = [
-            doc.width * 0.12,  # N° Arete
-            doc.width * 0.20,  # Nombre
-            doc.width * 0.15,  # Estado
-            doc.width * 0.18,  # Fecha Monta
-            doc.width * 0.20,  # Fecha Probable Parto
-            doc.width * 0.15   # Días Restantes
-        ]
-        table = Table(data, colWidths=col_widths)
-        table.setStyle(TableStyle([
-            # Estilo del encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            # Estilo del contenido
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ROWHEIGHT', (0, 0), (-1, -1), 30),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        
-        elements.append(table)
-        
-        # Construir el PDF con el fondo personalizado
-        app.logger.info('Generando el documento PDF...')
-        doc.build(elements, onFirstPage=draw_background, onLaterPages=draw_background)
-        
-        # Preparar para descarga
-        buffer.seek(0)
-        response = send_file(
-            buffer,
-            download_name=f'reporte_gestaciones_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
-            mimetype='application/pdf'
-        )
-        
-        app.logger.info('PDF generado exitosamente')
-        return response
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/reporte_gestacion.html', context)
         
     except Exception as e:
-        app.logger.error(f'Error al generar reporte PDF: {str(e)}')
-        app.logger.error('Traceback completo:', exc_info=True)
-        flash(f'Error al generar el reporte PDF: {str(e)}', 'error')
+        app.logger.error(f'Error al generar reporte de gestación: {str(e)}')
+        flash('Error al generar el reporte PDF', 'error')
         return redirect(url_for('gestacion'))
 
 @app.route('/generar_reporte_desparasitacion')
@@ -5061,7 +4652,6 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
             WHERE d.usuario_id = %s
         """
         params = [session['usuario_id']]
-        params = []
         
         # Agregar filtro de fechas si se proporcionan
         if fecha_inicio and fecha_fin:
@@ -5077,168 +4667,30 @@ def generar_reporte_desparasitacion(fecha_inicio=None, fecha_fin=None):
             flash('No hay registros de desparasitaciones para generar el reporte', 'warning')
             return redirect(url_for('desparasitacion'))
         
-        # Configurar el documento PDF
-        buffer = BytesIO()
+        # Preparar contexto para la plantilla
+        context = {
+            'desparasitaciones': desparasitaciones,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "SISTEMA GANADERO FINCA ABIGAIL",
+            'subtitulo': "Reporte de Desparasitaciones",
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin
+        }
         
-        def draw_background(canvas, doc):
-            try:
-                # Dibujar el logo como marca de agua
-                logo_path = os.path.join('static', 'images', 'logo.png')
-                if os.path.exists(logo_path):
-                    canvas.saveState()
-                    canvas.setFillAlpha(0.15)
-                    canvas.setStrokeAlpha(0.15)
-                    img_width = 180
-                    img_height = 180
-                    x = (doc.pagesize[0] - img_width) / 2
-                    y = doc.pagesize[1] - 140
-                    canvas.drawImage(logo_path, x, y,
-                                   width=img_width, height=img_height,
-                                   mask='auto',
-                                   preserveAspectRatio=True)
-                    canvas.restoreState()
-            except Exception as e:
-                app.logger.error(f'Error al dibujar el logo: {str(e)}')
-            
-            # Línea decorativa superior
-            canvas.setStrokeColor(colors.darkgreen)
-            canvas.setLineWidth(2)
-            canvas.line(doc.leftMargin, doc.pagesize[1] - 40,
-                      doc.pagesize[0] - doc.rightMargin, doc.pagesize[1] - 40)
-            
-            # Pie de página
-            canvas.setFont('Helvetica-Bold', 9)
-            canvas.setFillColor(colors.darkgreen)
-            canvas.line(doc.leftMargin, doc.bottomMargin,
-                      doc.pagesize[0] - doc.rightMargin, doc.bottomMargin)
-            
-            # Fecha de generación
-            canvas.drawString(doc.leftMargin, doc.bottomMargin - 15,
-                            f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-            
-            # Número de página
-            page_num = canvas.getPageNumber()
-            text = f"Página {page_num}"
-            text_width = canvas.stringWidth(text, 'Helvetica-Bold', 9)
-            canvas.drawString(doc.pagesize[0] - doc.rightMargin - text_width,
-                            doc.bottomMargin - 15, text)
-        
-        # Crear documento
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(letter),
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=60,
-            bottomMargin=40
-        )
-        
-        # Estilos
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=22,
-            spaceAfter=15,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        
-        elements = []
-        
-        # Título principal
-        elements.append(Paragraph("SISTEMA GANADERO FINCA ABIGAIL", title_style))
-        elements.append(Spacer(1, 15))
-        
-        # Subtítulo con rango de fechas si aplica
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Heading2'],
-            fontSize=16,
-            spaceAfter=15,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        
-        subtitle_text = "Reporte de Desparasitaciones"
-        if fecha_inicio and fecha_fin:
-            subtitle_text += f" ({fecha_inicio} - {fecha_fin})"
-        elements.append(Paragraph(subtitle_text, subtitle_style))
-        elements.append(Spacer(1, 15))
-        
-        # Encabezados de la tabla
-        headers = [
-            "Fecha",
-            "N° Arete",
-            "Nombre",
-            "Tipo Animal",
-            "Producto",
-            "Dosis",
-            "Próxima Dosis"
-        ]
-        data = [headers]
-        
-        # Datos de la tabla
-        for d in desparasitaciones:
-            row = [
-                d['fecha_aplicacion'].strftime('%d/%m/%Y'),
-                str(d['numero_arete']),
-                str(d['nombre']),
-                str(d['condicion']),
-                str(d['producto']),
-                str(d['dosis']) if d['dosis'] else 'N/A',
-                d['fecha_proxima'].strftime('%d/%m/%Y') if d['fecha_proxima'] else '-'
-            ]
-            data.append(row)
-        
-        # Crear y estilizar la tabla
-        col_widths = [
-            doc.width * 0.12,  # Fecha
-            doc.width * 0.12,  # N° Arete
-            doc.width * 0.18,  # Nombre
-            doc.width * 0.15,  # Tipo Animal
-            doc.width * 0.18,  # Producto
-            doc.width * 0.10,  # Dosis
-            doc.width * 0.15   # Próxima Dosis
-        ]
-        
-        table = Table(data, colWidths=col_widths)
-        table.setStyle(TableStyle([
-            # Estilo del encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            # Estilo del contenido
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ROWHEIGHT', (0, 0), (-1, -1), 30),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        
-        elements.append(table)
-        
-        # Generar PDF
-        app.logger.info('Generando el documento PDF de desparasitaciones...')
-        doc.build(elements, onFirstPage=draw_background, onLaterPages=draw_background)
-        
-        # Preparar descarga
-        buffer.seek(0)
-        response = send_file(
-            buffer,
-            download_name=f'reporte_desparasitaciones_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
-            mimetype='application/pdf'
-        )
-        
-        app.logger.info('PDF de desparasitaciones generado exitosamente')
-        return response
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/reporte_desparasitacion.html', context)
         
     except Exception as e:
+        app.logger.error(f'Error al generar reporte de desparasitación: {str(e)}')
+        flash('Error al generar el reporte PDF', 'error')
+        return redirect(url_for('desparasitacion'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+        
+
         app.logger.error(f'Error al generar reporte PDF de desparasitaciones: {str(e)}')
         app.logger.error('Traceback completo:', exc_info=True)
         flash(f'Error al generar el reporte PDF: {str(e)}', 'error')
@@ -5286,151 +4738,21 @@ def generar_reporte_vitaminizacion(fecha_inicio=None, fecha_fin=None):
             flash('No hay registros de vitaminización para generar el reporte', 'warning')
             return redirect(url_for('vitaminizacion'))
         
-        # Configurar el documento PDF
-        buffer = BytesIO()
+        # Preparar contexto para la plantilla
+        context = {
+            'vitaminizaciones': vitaminizaciones,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "SISTEMA GANADERO FINCA ABIGAIL",
+            'subtitulo': "Reporte de Vitaminización",
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin
+        }
         
-        def draw_background(canvas, doc):
-            try:
-                # Dibujar el logo como marca de agua
-                logo_path = os.path.join('static', 'images', 'logo.png')
-                if os.path.exists(logo_path):
-                    canvas.saveState()
-                    canvas.setFillAlpha(0.15)
-                    canvas.setStrokeAlpha(0.15)
-                    img_width = 180
-                    img_height = 180
-                    x = (doc.pagesize[0] - img_width) / 2
-                    y = doc.pagesize[1] - 140
-                    canvas.drawImage(logo_path, x, y,
-                                   width=img_width, height=img_height,
-                                   mask='auto',
-                                   preserveAspectRatio=True)
-                    canvas.restoreState()
-            except Exception as e:
-                app.logger.error(f'Error al dibujar el logo: {str(e)}')
-            
-            # Línea decorativa superior
-            canvas.setStrokeColor(colors.darkgreen)
-            canvas.setLineWidth(2)
-            canvas.line(doc.leftMargin, doc.pagesize[1] - 40,
-                      doc.pagesize[0] - doc.rightMargin, doc.pagesize[1] - 40)
-            
-            # Pie de página
-            canvas.setFont('Helvetica-Bold', 9)
-            canvas.setFillColor(colors.darkgreen)
-            canvas.line(doc.leftMargin, doc.bottomMargin,
-                      doc.pagesize[0] - doc.rightMargin, doc.bottomMargin)
-            
-            # Fecha de generación
-            canvas.drawString(doc.leftMargin, doc.bottomMargin - 15,
-                            f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-            
-            # Número de página
-            page_num = canvas.getPageNumber()
-            text = f"Página {page_num}"
-            text_width = canvas.stringWidth(text, 'Helvetica-Bold', 9)
-            canvas.drawString(doc.pagesize[0] - doc.rightMargin - text_width,
-                            doc.bottomMargin - 15, text)
-        
-        # Crear documento
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(letter),
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=60,
-            bottomMargin=40
-        )
-        
-        # Estilos
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=22,
-            spaceAfter=15,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        
-        elements = []
-        
-        # Título principal
-        elements.append(Paragraph("SISTEMA GANADERO FINCA ABIGAIL", title_style))
-        elements.append(Spacer(1, 15))
-        
-        # Subtítulo con rango de fechas si aplica
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Heading2'],
-            fontSize=16,
-            spaceAfter=15,
-            alignment=1,
-            textColor=colors.darkgreen
-        )
-        
-        subtitle_text = "Reporte de Vitaminización"
-        if fecha_inicio and fecha_fin:
-            subtitle_text += f" ({fecha_inicio} - {fecha_fin})"
-        elements.append(Paragraph(subtitle_text, subtitle_style))
-        elements.append(Spacer(1, 15))
-        
-        # Encabezados de la tabla
-        headers = [
-            "Fecha",
-            "N° Arete",
-            "Nombre",
-            "Tipo Animal",
-            "Producto",
-            "Dosis",
-            "Próxima Aplicación"
-        ]
-        data = [headers]
-        
-        # Datos de la tabla
-        for v in vitaminizaciones:
-            row = [
-                v['fecha_aplicacion'].strftime('%d/%m/%Y'),
-                str(v['numero_arete']),
-                str(v['nombre']),
-                str(v['condicion']),
-                str(v['producto']),
-                str(v['dosis'] or '-'),
-                v['fecha_proxima'].strftime('%d/%m/%Y') if v['fecha_proxima'] else '-'
-            ]
-            data.append(row)
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/reporte_vitaminizacion.html', context)
         
         # Crear y estilizar la tabla
-        col_widths = [
-            doc.width * 0.12,  # Fecha
-            doc.width * 0.12,  # N° Arete
-            doc.width * 0.18,  # Nombre
-            doc.width * 0.15,  # Tipo Animal
-            doc.width * 0.18,  # Producto
-            doc.width * 0.12,  # Dosis
-            doc.width * 0.13   # Próxima Aplicación
-        ]
-        
-        table = Table(data, colWidths=col_widths)
-        table.setStyle(TableStyle([
-            # Estilo del encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            # Estilo del contenido
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ROWHEIGHT', (0, 0), (-1, -1), 30),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        
-        elements.append(table)
+
         
         # Generar PDF
         app.logger.info('Generando el documento PDF de vitaminización...')
@@ -5494,363 +4816,27 @@ def generar_certificado_aftosa(certificado_id):
         """, (certificado_id,))
         animales = cursor.fetchall()
         
-        # Configurar el documento PDF
-        buffer = BytesIO()
+        # Preparar contexto para la plantilla
+        context = {
+            'registro': registro,
+            'animales': animales,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "CERTIFICADO DE VACUNACIÓN - FIEBRE AFTOSA"
+        }
         
-        # Función para agregar números de página y marca de agua
-        # Utilizando la función global add_page_number
-        
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,  # Formato vertical
-            rightMargin=25,
-            leftMargin=25,
-            topMargin=70,  # Aumentar margen superior para el encabezado
-            bottomMargin=40  # Aumentar margen inferior para número de página
-        )
-        
-        # Estilos
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30,
-            alignment=1,
-            textColor=colors.HexColor('#006400'),
-            leading=32
-        )
-        subtitle_style = ParagraphStyle(
-            'Subtitle',
-            parent=styles['Heading2'],
-            fontSize=18,
-            spaceAfter=30,
-            alignment=1,
-            textColor=colors.HexColor('#006400'),
-            leading=24
-        )
-        header_style = ParagraphStyle(
-            'Header',
-            parent=styles['Heading3'],
-            fontSize=14,
-            spaceBefore=20,
-            spaceAfter=12,
-            textColor=colors.HexColor('#006400'),
-            leading=16
-        )
-        normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=styles['Normal'],
-            fontSize=9,
-            spaceAfter=6,
-            leading=12
-        )
-        
-        def draw_header(canvas, doc):
-            canvas.saveState()
-            # Color principal azul médico
-            main_color = colors.HexColor('#005B96')
-            canvas.setStrokeColor(main_color)
-            canvas.setFillColor(main_color)
-            
-            # Solo borde exterior
-            canvas.setLineWidth(1)
-            canvas.rect(15, 15, doc.pagesize[0]-30, doc.pagesize[1]-30)
-            
-            # Título con fondo azul
-            canvas.rect(20, doc.pagesize[1]-80, doc.pagesize[0]-40, 40, fill=1)
-            canvas.setFillColor(colors.white)
-            canvas.setFont('Helvetica-Bold', 18)
-            canvas.drawCentredString(doc.pagesize[0]/2, doc.pagesize[1]-55, 
-                                   'CERTIFICADO DE VACUNACIÓN - FIEBRE AFTOSA')
-            
-            canvas.restoreState()
-        
-        elements = []
-        
-        # Espacio para el contenido después del encabezado
-        elements.append(Spacer(1, 10))
-        
-        # Estilo para las secciones
-        section_style = ParagraphStyle(
-            'SectionTitle',
-            parent=styles['Heading2'],
-            fontSize=10,
-            textColor=colors.HexColor('#005B96'),
-            spaceAfter=3,
-            spaceBefore=6,
-            borderWidth=0,  # Quitar borde
-            borderPadding=2,
-            alignment=0,
-            leading=12
-        )
-        
-        # Definir anchos de columnas para las tablas
-        page_width = doc.width
-        col1_width = page_width * 0.98  # Para tablas de una columna
-        col2_width = page_width * 0.48  # Para tablas de dos columnas
-
-        # Información del certificado en formato de ficha
-        elements.append(Paragraph("INFORMACIÓN DEL CERTIFICADO", section_style))
-        cert_data = [
-            [Paragraph("<b>N° Certificado:</b>", normal_style), 
-             Paragraph(f"{registro['numero_certificado']}", normal_style)],
-            [Paragraph("<b>Fecha:</b>", normal_style), 
-             Paragraph(f"{registro['fecha_registro'].strftime('%d/%m/%Y')}", normal_style)]
-        ]
-        cert_table = Table(cert_data, colWidths=[doc.width*0.3, doc.width*0.7])
-        cert_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.gray),
-        ]))
-        
-        # Crear un marco alrededor de la sección
-        section_data = [[cert_table]]
-        section_table = Table(section_data, colWidths=[doc.width])
-        section_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        elements.append(section_table)
-        elements.append(Spacer(1, 20))
-        
-        # Información del propietario
-        prop_info = [
-            [Paragraph("<b>Nombre del Propietario:</b>", normal_style),
-             Paragraph(f"{registro['nombre_propietario']}", normal_style)],
-            [Paragraph("<b>Nombre del Predio:</b>", normal_style),
-             Paragraph(f"{registro['nombre_predio']}", normal_style)],
-            [Paragraph("<b>Ubicación:</b>", normal_style),
-             Paragraph(f"{registro['provincia']}, {registro['canton']}, {registro['parroquia']}", normal_style)]
-        ]
-        prop_table = Table(prop_info, colWidths=[col1_width*0.4, col1_width*0.6])
-        prop_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.gray),
-        ]))
-        
-        # Crear un marco alrededor de la sección
-        section_data = [[prop_table]]
-        section_table = Table(section_data, colWidths=[doc.width])
-        section_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        elements.append(section_table)
-        elements.append(Spacer(1, 20))
-        
-        # Información de la vacunación
-        vac_info = [
-            [Paragraph("<b>Responsable de Vacunación:</b>", normal_style),
-             Paragraph(f"{registro['nombre_vacunador']}", normal_style)],
-            [Paragraph("<b>Fecha de Aplicación:</b>", normal_style),
-             Paragraph(f"{registro['fecha_registro'].strftime('%d de %B de %Y')}", normal_style)],
-            [Paragraph("<b>Tipo de Explotación:</b>", normal_style),
-             Paragraph(f"{registro['tipo_explotacion']}", normal_style)]
-        ]
-        vac_table = Table(vac_info, colWidths=[col1_width*0.4, col1_width*0.6])
-        vac_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.gray),
-        ]))
-        
-        # Crear un marco alrededor de la sección
-        section_data = [[vac_table]]
-        section_table = Table(section_data, colWidths=[doc.width])
-        section_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        elements.append(section_table)
-        elements.append(Spacer(1, 20))
-        
-        # Tabla de animales vacunados
-        headers = ["N° Arete", "Nombre", "Raza", "Sexo"]
-        data = [headers]
-        
-        # Datos de la tabla
-        for animal in animales:
-            row = [
-                str(animal['numero_arete']),
-                str(animal['nombre']),
-                str(animal['raza']),
-                str(animal['sexo'])
-            ]
-            data.append(row)
-        
-        # Crear y estilizar la tabla
-        animals_table = Table(data, colWidths=[col2_width/4.0]*4)
-        # Estilo común para todas las tablas
-        common_style = [
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
-            ('LINEBEFORE', (0, 0), (0, -1), 0.5, colors.gray),
-            ('LINEAFTER', (-1, 0), (-1, -1), 0.5, colors.gray),
-            ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.gray),
-            ('LINEABOVE', (0, 0), (-1, 0), 0.5, colors.gray),
-        ]
-        
-        # Aplicar estilos a las tablas
-        cert_table.setStyle(TableStyle(common_style))
-        elements.append(cert_table)
-        elements.append(Spacer(1, 10))
-        
-        # Información del propietario
-        elements.append(Paragraph("DATOS DEL PROPIETARIO", section_style))
-        prop_data = [
-            [Paragraph("<b>Nombre:</b>", normal_style),
-             Paragraph(f"{registro['nombre_propietario']}", normal_style)],
-            [Paragraph("<b>Predio:</b>", normal_style),
-             Paragraph(f"{registro['nombre_predio']}", normal_style)],
-            [Paragraph("<b>Ubicación:</b>", normal_style),
-             Paragraph(f"{registro['provincia']}, {registro['canton']}, {registro['parroquia']}", normal_style)]
-        ]
-        prop_table = Table(prop_data, colWidths=[doc.width*0.3, doc.width*0.7])
-        prop_table.setStyle(TableStyle(common_style))
-        elements.append(prop_table)
-        elements.append(Spacer(1, 10))
-        
-        # Información de la vacunación
-        elements.append(Paragraph("DATOS DE LA VACUNACIÓN", section_style))
-        vac_data = [
-            [Paragraph("<b>Responsable:</b>", normal_style),
-             Paragraph(f"{registro['nombre_vacunador']}", normal_style)],
-            [Paragraph("<b>Fecha Aplicación:</b>", normal_style),
-             Paragraph(f"{registro['fecha_registro'].strftime('%d/%m/%Y')}", normal_style)],
-            [Paragraph("<b>Tipo Explotación:</b>", normal_style),
-             Paragraph(f"{registro['tipo_explotacion']}", normal_style)]
-        ]
-        vac_table = Table(vac_data, colWidths=[doc.width*0.3, doc.width*0.7])
-        vac_table.setStyle(TableStyle(common_style))
-        elements.append(vac_table)
-        elements.append(Spacer(1, 10))
-        
-        # Forzar nueva página para la lista de animales y firmas
-        elements.append(PageBreak())
-        elements.append(Spacer(1, 40))  # Agregar espacio después del salto de página
-        
-        # Tabla de animales
-        elements.append(Paragraph("REGISTRO DE ANIMALES VACUNADOS", section_style))
-        
-        # Encabezados y datos
-        headers = [[Paragraph("<b>N° Arete</b>", normal_style),
-                   Paragraph("<b>Nombre</b>", normal_style),
-                   Paragraph("<b>Raza</b>", normal_style),
-                   Paragraph("<b>Sexo</b>", normal_style)]]
-        
-        animal_data = []
-        for animal in animales:
-            animal_data.append([
-                Paragraph(str(animal['numero_arete']), normal_style),
-                Paragraph(str(animal['nombre']), normal_style),
-                Paragraph(str(animal['raza']), normal_style),
-                Paragraph(str(animal['sexo']), normal_style)
-            ])
-        
-        animals_table = Table(headers + animal_data, colWidths=[doc.width/4.0]*4)
-        animals_table.setStyle(TableStyle(
-            common_style + [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#005B96')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ]
-        ))
-        elements.append(animals_table)
-        
-        # Espacio para firmas
-        elements.append(Spacer(1, 20))
-        
-        # Crear tabla para las firmas
-        firma_data = [
-            [Paragraph('_'*50, normal_style), Paragraph('_'*50, normal_style)],
-            [Paragraph('<b>Firma y Sello del Propietario</b>', normal_style), 
-             Paragraph('<b>Firma y Sello del Vacunador</b>', normal_style)],
-            [Paragraph(registro['nombre_propietario'], normal_style),
-             Paragraph(registro['nombre_vacunador'], normal_style)],
-            [Paragraph('C.I.: ________________', normal_style),
-             Paragraph('C.I.: ________________', normal_style)]
-        ]
-        
-        firma_table = Table(firma_data, colWidths=[doc.width/2.0]*2)
-        firma_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('TOPPADDING', (0, 1), (-1, 1), 15),
-            ('BOTTOMPADDING', (0, 1), (-1, 1), 5),
-        ]))
-        
-        elements.append(firma_table)
-        
-        # Nota al pie
-        elements.append(Spacer(1, 20))
-        note_style = ParagraphStyle(
-            'Note',
-            parent=styles['Normal'],
-            fontSize=8,
-            textColor=colors.black,
-            alignment=1
-        )
-        elements.append(Paragraph("Este certificado es un documento oficial. La falsificación o alteración de este documento está sujeta a sanciones legales.", note_style))
-        
-        # Generar PDF con el fondo decorativo
-        doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
-        
-        # Preparar descarga
-        buffer.seek(0)
-        return send_file(
-            buffer,
-            download_name=f'certificado_aftosa_{registro["numero_certificado"]}_{datetime.now().strftime("%Y%m%d")}.pdf',
-            mimetype='application/pdf'
-        )
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/certificado_aftosa.html', context)
         
     except Exception as e:
+        app.logger.error(f'Error al generar certificado de aftosa: {str(e)}')
+        flash('Error al generar el certificado PDF', 'error')
+        return redirect(url_for('fiebre_aftosa'))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
         app.logger.error(f'Error al generar certificado PDF: {str(e)}')
         app.logger.error('Traceback completo:', exc_info=True)
         flash(f'Error al generar el certificado PDF: {str(e)}', 'error')
@@ -5863,8 +4849,6 @@ def generar_certificado_aftosa(certificado_id):
 
 @app.route('/carbunco/generar_pdf/<int:registro_id>')
 def generar_pdf_carbunco(registro_id):
-    conn = None
-    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -5890,174 +4874,20 @@ def generar_pdf_carbunco(registro_id):
         ''', (registro_id,))
         animales = cursor.fetchall()
         
-        # Crear el PDF
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=72,
-            leftMargin=72,
-            topMargin=72,
-            bottomMargin=72
-        )
+        # Preparar contexto para la plantilla
+        context = {
+            'registro': registro,
+            'animales': animales,
+            'fecha_generacion': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            'titulo': "CERTIFICADO DE VACUNACIÓN CONTRA CARBUNCO"
+        }
         
-        # Estilos
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            textColor=colors.HexColor('#005B96'),
-            spaceAfter=30,
-            alignment=1
-        )
-        
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#005B96'),
-            spaceAfter=20,
-            alignment=1
-        )
-        
-        section_style = ParagraphStyle(
-            'SectionTitle',
-            parent=styles['Heading3'],
-            fontSize=12,
-            textColor=colors.HexColor('#005B96'),
-            spaceAfter=15
-        )
-        
-        normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=styles['Normal'],
-            fontSize=11,
-            textColor=colors.black,
-            spaceAfter=10
-        )
-        
-        # Elementos del PDF
-        elements = []
-        
-        # Título principal
-        elements.append(Paragraph('CERTIFICADO DE VACUNACIÓN CONTRA CARBUNCO', title_style))
-        elements.append(Spacer(1, 20))
-        
-        # Información del registro
-        data = [
-            ['Fecha de Aplicación:', registro['fecha_registro'].strftime('%d/%m/%Y')],
-            ['Producto:', registro.get('nombre_producto', registro.get('producto', 'No especificado'))],
-            ['Lote:', registro['lote']],
-            ['Vacunador:', registro['vacunador']],
-            ['Próxima Aplicación:', registro['proxima_aplicacion'].strftime('%d/%m/%Y')]
-        ]
-        
-        # Crear tabla con la información
-        info_table = Table(data, colWidths=[doc.width/3.0, doc.width/1.5])
-        common_style = [
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ]
-        
-        info_table.setStyle(TableStyle(common_style))
-        elements.append(info_table)
-        elements.append(Spacer(1, 20))
-        
-        # Lista de animales
-        elements.append(Paragraph('REGISTRO DE ANIMALES VACUNADOS', section_style))
-        
-        # Encabezados y datos de animales
-        headers = [[
-            Paragraph('<b>N° Arete</b>', normal_style),
-            Paragraph('<b>Nombre</b>', normal_style),
-            Paragraph('<b>Raza</b>', normal_style),
-            Paragraph('<b>Sexo</b>', normal_style)
-        ]]
-        
-        animal_data = []
-        for animal in animales:
-            animal_data.append([
-                Paragraph(str(animal['numero_arete']), normal_style),
-                Paragraph(str(animal['nombre']), normal_style),
-                Paragraph(str(animal['raza']), normal_style),
-                Paragraph(str(animal['sexo']), normal_style)
-            ])
-        
-        animals_table = Table(headers + animal_data, colWidths=[doc.width/4.0]*4)
-        animals_table.setStyle(TableStyle(
-            common_style + [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#005B96')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ]
-        ))
-        elements.append(animals_table)
-        
-        # Espacio para firmas
-        elements.append(Spacer(1, 30))
-        
-        # Tabla de firmas
-        firma_style = ParagraphStyle(
-            'Firma',
-            parent=normal_style,
-            fontSize=10,
-            alignment=1
-        )
-        firma_data = [
-            [Paragraph('_'*20, firma_style), Paragraph('_'*20, firma_style)],
-            [Paragraph('<b>Firma y Sello del Propietario</b>', firma_style),
-             Paragraph('<b>Firma y Sello del Vacunador</b>', firma_style)],
-            [Paragraph('_________________', firma_style),
-             Paragraph(registro['vacunador'], firma_style)],
-            [Paragraph('C.I.: ____________', firma_style),
-             Paragraph('C.I.: ____________', firma_style)]
-        ]
-        
-        firma_table = Table(firma_data, colWidths=[doc.width/2.0]*2)
-        firma_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('TOPPADDING', (0, 1), (-1, 1), 15),
-            ('BOTTOMPADDING', (0, 1), (-1, 1), 5),
-        ]))
-        elements.append(firma_table)
-        
-        # Nota al pie
-        elements.append(Spacer(1, 20))
-        note_style = ParagraphStyle(
-            'Note',
-            parent=styles['Normal'],
-            fontSize=8,
-            textColor=colors.black,
-            alignment=1
-        )
-        elements.append(Paragraph('Este certificado es un documento oficial. La falsificación o alteración de este documento está sujeta a sanciones legales.', note_style))
-        
-        # Generar PDF
-        doc.build(elements)
-        
-        # Preparar descarga
-        buffer.seek(0)
-        return send_file(
-            buffer,
-            download_name=f'certificado_carbunco_{registro_id}_{datetime.now().strftime("%Y%m%d")}.pdf',
-            mimetype='application/pdf'
-        )
+        # Generar PDF usando xhtml2pdf
+        return render_pdf_from_template('reportes_pdf/certificado_carbunco.html', context)
         
     except Exception as e:
-        app.logger.error(f'Error al generar certificado PDF de carbunco: {str(e)}')
-        app.logger.error('Traceback completo:', exc_info=True)
-        flash(f'Error al generar el certificado PDF: {str(e)}', 'error')
+        app.logger.error(f'Error al generar certificado de carbunco: {str(e)}')
+        flash('Error al generar el certificado PDF', 'error')
         return redirect(url_for('carbunco'))
     finally:
         if cursor:
@@ -6128,6 +4958,16 @@ def vista_registro_leche():
 # Esta ruta ha sido reemplazada por el blueprint registro_leche_bp
 
 # Esta ruta ha sido reemplazada por el blueprint registro_leche_bp
+
+def render_pdf_from_template(template_name, context):
+    html = render_template(template_name, **context)
+    response = make_response()
+    pdf = pisa.CreatePDF(html, dest=response)
+    if not pdf.err:
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=reporte.pdf'
+        return response
+    return 'Error al generar PDF', 500
 
 if __name__ == '__main__':
     init_db()

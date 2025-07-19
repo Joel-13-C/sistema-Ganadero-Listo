@@ -1,0 +1,106 @@
+{% extends "reportes_pdf/base_reporte.html" %}
+
+{% block content %}
+<div class="certificate-content">
+    <h2>{{ titulo }}</h2>
+    
+    <div class="certificate-info">
+        <h3>INFORMACIÓN DEL CERTIFICADO</h3>
+        <table class="info-table">
+            <tr>
+                <td><strong>N° Certificado:</strong></td>
+                <td>{{ registro.numero_certificado }}</td>
+            </tr>
+            <tr>
+                <td><strong>Fecha:</strong></td>
+                <td>{{ registro.fecha_registro.strftime('%d/%m/%Y') }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="owner-info">
+        <h3>DATOS DEL PROPIETARIO</h3>
+        <table class="info-table">
+            <tr>
+                <td><strong>Nombre:</strong></td>
+                <td>{{ registro.nombre_propietario }}</td>
+            </tr>
+            <tr>
+                <td><strong>Predio:</strong></td>
+                <td>{{ registro.nombre_predio }}</td>
+            </tr>
+            <tr>
+                <td><strong>Ubicación:</strong></td>
+                <td>{{ registro.provincia }}, {{ registro.canton }}, {{ registro.parroquia }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="vaccination-info">
+        <h3>DATOS DE LA VACUNACIÓN</h3>
+        <table class="info-table">
+            <tr>
+                <td><strong>Responsable:</strong></td>
+                <td>{{ registro.nombre_vacunador }}</td>
+            </tr>
+            <tr>
+                <td><strong>Fecha Aplicación:</strong></td>
+                <td>{{ registro.fecha_registro.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            <tr>
+                <td><strong>Tipo Explotación:</strong></td>
+                <td>{{ registro.tipo_explotacion }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="animals-section">
+        <h3>REGISTRO DE ANIMALES VACUNADOS</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>N° Arete</th>
+                    <th>Nombre</th>
+                    <th>Raza</th>
+                    <th>Sexo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for animal in animales %}
+                <tr>
+                    <td>{{ animal.numero_arete }}</td>
+                    <td>{{ animal.nombre }}</td>
+                    <td>{{ animal.raza }}</td>
+                    <td>{{ animal.sexo }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="signatures">
+        <table class="signature-table">
+            <tr>
+                <td>_________________________</td>
+                <td>_________________________</td>
+            </tr>
+            <tr>
+                <td><strong>Firma y Sello del Propietario</strong></td>
+                <td><strong>Firma y Sello del Vacunador</strong></td>
+            </tr>
+            <tr>
+                <td>{{ registro.nombre_propietario }}</td>
+                <td>{{ registro.nombre_vacunador }}</td>
+            </tr>
+            <tr>
+                <td>C.I.: ________________</td>
+                <td>C.I.: ________________</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="footer-note">
+        <p><em>Este certificado es un documento oficial. La falsificación o alteración de este documento está sujeta a sanciones legales.</em></p>
+    </div>
+</div>
+{% endblock %} 
