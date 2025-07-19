@@ -1,0 +1,287 @@
+ESTRUCTURA COMPLETA DE LA BASE DE DATOS
+==========================================
+
+TABLA: usuarios
+---------------
+- id (SERIAL PRIMARY KEY)
+- username (VARCHAR(50) UNIQUE NOT NULL)
+- email (VARCHAR(100) UNIQUE NOT NULL)
+- password (VARCHAR(255) NOT NULL)
+- nombre (VARCHAR(100))
+- apellido (VARCHAR(100))
+- telefono (VARCHAR(20))
+- direccion (TEXT)
+- foto_perfil (VARCHAR(500))
+- cargo (VARCHAR(100))
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+TABLA: animales
+---------------
+- id (SERIAL PRIMARY KEY)
+- numero_arete (VARCHAR(50) UNIQUE NOT NULL)
+- nombre (VARCHAR(100))
+- sexo (VARCHAR(10) NOT NULL CHECK (sexo IN ('Macho', 'Hembra')))
+- raza (VARCHAR(100))
+- condicion (VARCHAR(20) NOT NULL CHECK (condicion IN ('Toro', 'Torete', 'Vaca', 'Vacona', 'Ternero', 'Ternera')))
+- fecha_nacimiento (DATE)
+- propietario (VARCHAR(200))
+- foto_path (VARCHAR(500))
+- padre_arete (VARCHAR(50))
+- madre_arete (VARCHAR(50))
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: pastizales
+-----------------
+- id (SERIAL PRIMARY KEY)
+- nombre (VARCHAR(100) NOT NULL)
+- ubicacion (TEXT)
+- area (DECIMAL(10,2))  // NOTA: La columna se llama 'area', NO 'dimension'
+- estado (VARCHAR(20) DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo', 'Mantenimiento')))
+- descripcion (TEXT)
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: animales_pastizal
+------------------------
+- id (SERIAL PRIMARY KEY)
+- animal_id (INT NOT NULL)
+- pastizal_id (INT NOT NULL)
+- fecha_asignacion (DATE NOT NULL)
+- fecha_retiro (DATE)
+- observaciones (TEXT)
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+- FOREIGN KEY (pastizal_id) REFERENCES pastizales(id)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: inseminaciones
+---------------------
+- id (SERIAL PRIMARY KEY)
+- animal_id (INT NOT NULL)
+- fecha_inseminacion (DATE NOT NULL)
+- tipo_inseminacion (VARCHAR(50) NOT NULL)
+- semental (VARCHAR(100) NOT NULL)
+- raza_semental (VARCHAR(100))
+- codigo_pajuela (VARCHAR(100))
+- inseminador (VARCHAR(100))
+- observaciones (TEXT)
+- estado (VARCHAR(50) DEFAULT 'Pendiente')
+- exitosa (BOOLEAN DEFAULT FALSE)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+
+TABLA: gestaciones
+------------------
+- id (SERIAL PRIMARY KEY)
+- animal_id (INT NOT NULL)
+- fecha_monta (DATE NOT NULL)
+- fecha_probable_parto (DATE NOT NULL)
+- estado (VARCHAR(20) NOT NULL DEFAULT 'En Gestación' CHECK (estado IN ('En Gestación', 'Finalizado', 'Abortado')))
+- observaciones (TEXT)
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: registro_leche
+---------------------
+- id (SERIAL PRIMARY KEY)
+- animal_id (INT NOT NULL)
+- fecha (DATE NOT NULL)
+- cantidad_manana (DECIMAL(10,2))
+- cantidad_tarde (DECIMAL(10,2))
+- total_dia (DECIMAL(10,2))
+- observaciones (TEXT)
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: ventas_leche
+-------------------
+- id (SERIAL PRIMARY KEY)
+- fecha (DATE NOT NULL)
+- cantidad_litros (DECIMAL(10,2) NOT NULL)
+- precio_litro (DECIMAL(10,2) NOT NULL)
+- total (DECIMAL(10,2) NOT NULL)
+- comprador (VARCHAR(200))
+- forma_pago (VARCHAR(20) DEFAULT 'Efectivo' CHECK (forma_pago IN ('Efectivo', 'Transferencia', 'Cheque', 'Otro')))
+- estado_pago (VARCHAR(20) DEFAULT 'Pendiente' CHECK (estado_pago IN ('Pagado', 'Pendiente', 'Parcial')))
+- observaciones (TEXT)
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: ingresos
+---------------
+- id (SERIAL PRIMARY KEY)
+- fecha (DATE NOT NULL)
+- categoria (VARCHAR(100) NOT NULL)
+- monto (DECIMAL(10,2) NOT NULL)
+- descripcion (TEXT)
+- comprobante (VARCHAR(255))
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: gastos
+-------------
+- id (SERIAL PRIMARY KEY)
+- fecha (DATE NOT NULL)
+- categoria (VARCHAR(100) NOT NULL)
+- monto (DECIMAL(10,2) NOT NULL)
+- descripcion (TEXT)
+- comprobante (VARCHAR(255))
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: desparasitaciones
+------------------------
+- id (SERIAL PRIMARY KEY)
+- fecha_registro (DATE NOT NULL)
+- producto (VARCHAR(100) NOT NULL)
+- lote (VARCHAR(50))
+- aplicacion_general (BOOLEAN DEFAULT TRUE)
+- proxima_aplicacion (DATE)
+- usuario_id (INT)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: vitaminizaciones
+-----------------------
+- id (SERIAL PRIMARY KEY)
+- fecha_registro (DATE NOT NULL)
+- producto (VARCHAR(100) NOT NULL)
+- lote (VARCHAR(50))
+- aplicacion_general (BOOLEAN DEFAULT TRUE)
+- proxima_aplicacion (DATE)
+- usuario_id (INT)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: fiebre_aftosa
+--------------------
+- id (SERIAL PRIMARY KEY)
+- fecha_registro (DATE NOT NULL)
+- producto (VARCHAR(100) NOT NULL)
+- lote (VARCHAR(50))
+- aplicacion_general (BOOLEAN DEFAULT TRUE)
+- proxima_aplicacion (DATE)
+- usuario_id (INT)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: carbunco
+---------------
+- id (SERIAL PRIMARY KEY)
+- fecha_registro (DATE NOT NULL)
+- producto (VARCHAR(100) NOT NULL)
+- lote (VARCHAR(50))
+- vacunador (VARCHAR(100))
+- aplicacion_general (BOOLEAN DEFAULT TRUE)
+- proxima_aplicacion (DATE)
+- usuario_id (INT)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: auditoria
+----------------
+- id (SERIAL PRIMARY KEY)
+- usuario_id (INT)
+- accion (VARCHAR(50) NOT NULL)
+- tabla (VARCHAR(50) NOT NULL)  // NOTA: Se llama 'tabla', NO 'modulo'
+- registro_id (INT)
+- detalles (TEXT)  // NOTA: Se llama 'detalles', NO 'descripcion'
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: config_alarmas
+---------------------
+- id (SERIAL PRIMARY KEY)
+- usuario_id (INT NOT NULL)
+- tipo (VARCHAR(50) NOT NULL)
+- dias_anticipacion (INT DEFAULT 7)  // NOTA: Se llama 'dias_anticipacion', NO 'dias_antes'
+- activo (BOOLEAN DEFAULT TRUE)
+- email (VARCHAR(255))  // NOTA: Esta columna SÍ existe
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: alarmas_enviadas
+-----------------------
+- id (SERIAL PRIMARY KEY)
+- usuario_id (INT)
+- tipo (VARCHAR(50) NOT NULL)
+- descripcion (TEXT)
+- fecha_envio (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLA: genealogia
+-----------------
+- id (SERIAL PRIMARY KEY)
+- animal_id (INT NOT NULL)
+- padre_arete (VARCHAR(50))
+- madre_arete (VARCHAR(50))
+- abuelo_paterno_arete (VARCHAR(50))
+- abuela_paterna_arete (VARCHAR(50))
+- abuelo_materno_arete (VARCHAR(50))
+- abuela_materna_arete (VARCHAR(50))
+- observaciones (TEXT)
+- usuario_id (INT)
+- fecha_registro (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+- FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+
+TABLAS DE RELACIÓN (MANY-TO-MANY)
+==================================
+
+TABLA: carbunco_animal
+----------------------
+- id (SERIAL PRIMARY KEY)
+- carbunco_id (INT NOT NULL)
+- animal_id (INT NOT NULL)
+- FOREIGN KEY (carbunco_id) REFERENCES carbunco(id)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+
+TABLA: fiebre_aftosa_animal
+---------------------------
+- id (SERIAL PRIMARY KEY)
+- fiebre_aftosa_id (INT NOT NULL)
+- animal_id (INT NOT NULL)
+- FOREIGN KEY (fiebre_aftosa_id) REFERENCES fiebre_aftosa(id)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+
+TABLA: desparasitacion_animal
+-----------------------------
+- id (SERIAL PRIMARY KEY)
+- desparasitacion_id (INT NOT NULL)
+- animal_id (INT NOT NULL)
+- FOREIGN KEY (desparasitacion_id) REFERENCES desparasitaciones(id)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+
+TABLA: vitaminizacion_animal
+----------------------------
+- id (SERIAL PRIMARY KEY)
+- vitaminizacion_id (INT NOT NULL)
+- animal_id (INT NOT NULL)
+- FOREIGN KEY (vitaminizacion_id) REFERENCES vitaminizaciones(id)
+- FOREIGN KEY (animal_id) REFERENCES animales(id)
+
+ERRORES IDENTIFICADOS PARA CORREGIR:
+====================================
+
+1. PASTIZALES: La columna se llama 'area', NO 'dimension'
+2. AUDITORIA: La columna se llama 'tabla', NO 'modulo'
+3. AUDITORIA: La columna se llama 'detalles', NO 'descripcion'
+4. CONFIG_ALARMAS: La columna se llama 'dias_anticipacion', NO 'dias_antes'
+5. CONFIG_ALARMAS: La columna 'email' SÍ existe
+6. REGISTRO_LECHE: La tabla se llama 'registro_leche', NO 'produccion_leche'
+
+NOTAS IMPORTANTES:
+==================
+
+- Todas las tablas tienen 'usuario_id' como foreign key
+- Las fechas usan tipo DATE o TIMESTAMP según corresponda
+- Los decimales usan DECIMAL(10,2) para montos
+- Los VARCHAR tienen límites apropiados según el uso
+- Las tablas de relación permiten many-to-many entre tratamientos y animales 

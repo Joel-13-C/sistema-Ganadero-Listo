@@ -1,0 +1,44 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e3f2fd;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#bbdefb;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fondo circular -->
+  <circle cx="100" cy="100" r="80" fill="url(#grad1)" stroke="#2196f3" stroke-width="2"/>
+  
+  <!-- Icono de vaca estilizado -->
+  <g transform="translate(100, 100)">
+    <!-- Cuerpo -->
+    <ellipse cx="0" cy="10" rx="35" ry="25" fill="#8d6e63" stroke="#5d4037" stroke-width="2"/>
+    
+    <!-- Cabeza -->
+    <ellipse cx="-25" cy="-15" rx="15" ry="12" fill="#8d6e63" stroke="#5d4037" stroke-width="2"/>
+    
+    <!-- Orejas -->
+    <ellipse cx="-35" cy="-25" rx="5" ry="8" fill="#8d6e63" stroke="#5d4037" stroke-width="1"/>
+    <ellipse cx="-15" cy="-25" rx="5" ry="8" fill="#8d6e63" stroke="#5d4037" stroke-width="1"/>
+    
+    <!-- Ojos -->
+    <circle cx="-30" cy="-20" r="2" fill="#000"/>
+    <circle cx="-20" cy="-20" r="2" fill="#000"/>
+    
+    <!-- Nariz -->
+    <ellipse cx="-25" cy="-10" rx="3" ry="2" fill="#5d4037"/>
+    
+    <!-- Patas -->
+    <rect x="-30" y="30" width="4" height="15" fill="#8d6e63" stroke="#5d4037" stroke-width="1"/>
+    <rect x="-10" y="30" width="4" height="15" fill="#8d6e63" stroke="#5d4037" stroke-width="1"/>
+    <rect x="10" y="30" width="4" height="15" fill="#8d6e63" stroke="#5d4037" stroke-width="1"/>
+    <rect x="30" y="30" width="4" height="15" fill="#8d6e63" stroke="#5d4037" stroke-width="1"/>
+    
+    <!-- Cola -->
+    <path d="M 35 0 Q 45 -10 50 0" stroke="#8d6e63" stroke-width="3" fill="none"/>
+  </g>
+  
+  <!-- Símbolo de "no" -->
+  <line x1="40" y1="40" x2="160" y2="160" stroke="#f44336" stroke-width="4" stroke-linecap="round"/>
+  <line x1="160" y1="40" x2="40" y2="160" stroke="#f44336" stroke-width="4" stroke-linecap="round"/>
+</svg> 

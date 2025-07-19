@@ -38,10 +38,10 @@
                 </thead>
                 <tbody>
                     {% for ingreso in ingresos_por_categoria %}
-                        {% if ingreso.total > 0 %}
+                        {% if ingreso[1] > 0 %}
                         <tr>
-                            <td>{{ ingreso.categoria }}</td>
-                            <td>${{ "%.2f"|format(ingreso.total) }}</td>
+                            <td>{{ ingreso[0] }}</td>
+                            <td>${{ "%.2f"|format(ingreso[1]) }}</td>
                         </tr>
                         {% endif %}
                     {% endfor %}
@@ -64,10 +64,10 @@
                 </thead>
                 <tbody>
                     {% for gasto in gastos_por_categoria %}
-                        {% if gasto.total > 0 %}
+                        {% if gasto[1] > 0 %}
                         <tr>
-                            <td>{{ gasto.categoria }}</td>
-                            <td>${{ "%.2f"|format(gasto.total) }}</td>
+                            <td>{{ gasto[0] }}</td>
+                            <td>${{ "%.2f"|format(gasto[1]) }}</td>
                         </tr>
                         {% endif %}
                     {% endfor %}

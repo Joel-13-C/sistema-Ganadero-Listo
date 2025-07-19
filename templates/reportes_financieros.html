@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Reportes Financieros - {{ año_actual }}</h2>
+    <h2>Reportes Financieros - {{ anio_actual }}</h2>
     
     <!-- Formulario de filtrado -->
     <div class="card mb-4">
@@ -11,8 +11,8 @@
                 <div class="col-md-5">
                     <label for="anio" class="form-label">Año</label>
                     <select class="form-select" id="anio" name="anio">
-                        {% for anio in range(2020, (año_actual + 1))|reverse %}
-                            <option value="{{ anio }}" {% if anio == año_actual %}selected{% endif %}>{{ anio }}</option>
+                        {% for anio in range(2020, (anio_actual + 1))|reverse %}
+                            <option value="{{ anio }}" {% if anio == anio_actual %}selected{% endif %}>{{ anio }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -37,7 +37,7 @@
                     <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                 </div>
                 <div class="col-md-12 mt-3 d-flex justify-content-end">
-                    <a href="{{ url_for('descargar_reporte_pdf', anio=año_actual, mes=mes_actual) }}" class="btn btn-success">
+                    <a href="{{ url_for('descargar_reporte_pdf', anio=anio_actual, mes=mes_actual) }}" class="btn btn-success">
                         <i class="fas fa-file-pdf"></i> Descargar Reporte PDF
                     </a>
                 </div>
@@ -80,7 +80,7 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Ingresos por Categoría - {{ nombre_mes_actual }} {{ año_actual }}</h5>
+                    <h5 class="card-title">Ingresos por Categoría - {{ nombre_mes_actual }} {{ anio_actual }}</h5>
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
@@ -92,8 +92,8 @@
                             <tbody>
                                 {% for ingreso in ingresos_por_categoria %}
                                 <tr>
-                                    <td>{{ ingreso.categoria }}</td>
-                                    <td>$ {{ "%.2f"|format(ingreso.total|float) }}</td>
+                                    <td>{{ ingreso[0] }}</td>
+                                    <td>$ {{ "%.2f"|format(ingreso[1]|float) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -105,7 +105,7 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Gastos por Categoría - {{ nombre_mes_actual }} {{ año_actual }}</h5>
+                    <h5 class="card-title">Gastos por Categoría - {{ nombre_mes_actual }} {{ anio_actual }}</h5>
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
@@ -117,8 +117,8 @@
                             <tbody>
                                 {% for gasto in gastos_por_categoria %}
                                 <tr>
-                                    <td>{{ gasto.categoria }}</td>
-                                    <td>$ {{ "%.2f"|format(gasto.total|float) }}</td>
+                                    <td>{{ gasto[0] }}</td>
+                                    <td>$ {{ "%.2f"|format(gasto[1]|float) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

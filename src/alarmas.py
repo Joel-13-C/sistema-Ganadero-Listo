@@ -40,45 +40,8 @@ class SistemaAlarmas:
         self._crear_tabla_si_no_existe()
         
     def _crear_tabla_si_no_existe(self):
-        """Crea la tabla de alarmas si no existe"""
-        try:
-            conn = self.db_connection()
-            if not conn:
-                logger.error("No se pudo conectar a la base de datos para crear tabla de alarmas")
-                return
-                
-            cursor = conn.cursor()
-            
-            # Verificar si la tabla config_alarmas existe
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public'
-                AND table_name = 'config_alarmas'
-            """)
-            
-            if cursor.fetchone()[0] == 0:
-                # Crear tabla si no existe
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS config_alarmas (
-                        id SERIAL PRIMARY KEY,
-                        usuario_id INT NOT NULL,
-                        tipo VARCHAR(50) NOT NULL,
-                        dias_anticipacion INT DEFAULT 7,
-                        activo BOOLEAN DEFAULT TRUE,
-                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-                    )
-                """)
-                conn.commit()
-                logger.info("Tabla de alarmas creada correctamente")
-            
-        except Exception as e:
-            logger.error(f"Error al crear tabla de alarmas: {e}")
-        finally:
-            if 'cursor' in locals() and cursor:
-                cursor.close()
-            if 'conn' in locals() and conn:
-                conn.close()
+        """La tabla de alarmas ya existe en la base de datos"""
+        pass
     
     def configurar_alarma(self, tipo, email, dias_anticipacion=7):
         """

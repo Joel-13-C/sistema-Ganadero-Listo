@@ -35,11 +35,15 @@ def login_required(f):
 @login_required
 def vista_registro_leche():
     try:
-        conn = get_db_connection()
-        if not conn:
-            flash('Error al conectar con la base de datos', 'danger')
+        # Usar el nuevo manejo de errores de conexión
+        from app import handle_db_connection_error
+        success, conn_or_error = handle_db_connection_error()
+        
+        if not success:
+            flash(conn_or_error, 'danger')
             return render_template('registro_leche.html', registros=[], animales=[])
-            
+        
+        conn = conn_or_error
         cursor = conn.cursor()
         
         # Obtener filtros
@@ -83,12 +87,13 @@ def vista_registro_leche():
     
     except Exception as e:
         print(f"Error en vista_registro_leche: {str(e)}")
-        flash(f'Error al cargar los registros: {str(e)}', 'danger')
+        flash('Error al conectar con la base de datos', 'danger')
         return render_template('registro_leche.html', registros=[], animales=[])
     
     finally:
-        if conn:
+        if 'cursor' in locals() and cursor:
             cursor.close()
+        if 'conn' in locals() and conn:
             conn.close()
 
 # Ruta para agregar un nuevo registro de leche

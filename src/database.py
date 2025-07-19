@@ -23,6 +23,12 @@ class DatabaseConnection:
             from urllib.parse import urlparse
             parsed = urlparse(self.db_url)
             
+            # Configuración de SSL para Render
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             # Intentar establecer la conexión con pg8000
             self.connection = pg8000.Connection(
                 host=parsed.hostname,
@@ -30,30 +36,36 @@ class DatabaseConnection:
                 user=parsed.username,
                 password=parsed.password,
                 database=parsed.path[1:] if parsed.path else 'ganadero_anwt',
-                ssl_context=True
+                ssl_context=ssl_context
             )
             
             logger.info("Conexión a PostgreSQL establecida exitosamente")
             
         except Exception as e:
             logger.error(f"Error al conectar a PostgreSQL: {e}")
-            raise Exception(f"Error de conexión a PostgreSQL: {e}")
+            self.connection = None
 
     def get_connection(self):
         """
         Obtiene una conexión a la base de datos, reconectando si es necesario
         """
         try:
-            if not hasattr(self, 'connection') or self.connection.is_closed():
+            # pg8000 no tiene método is_closed(), verificamos si la conexión existe
+            if not hasattr(self, 'connection') or self.connection is None:
                 from urllib.parse import urlparse
                 parsed = urlparse(self.db_url)
+                # Configuración de SSL para Render
+                import ssl
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
                 self.connection = pg8000.Connection(
                     host=parsed.hostname,
                     port=parsed.port or 5432,
                     user=parsed.username,
                     password=parsed.password,
                     database=parsed.path[1:] if parsed.path else 'ganadero_anwt',
-                    ssl_context=True
+                    ssl_context=ssl_context
                 )
             return self.connection
         except Exception as err:
@@ -395,7 +407,17 @@ class DatabaseConnection:
             logger.error(f"Error al registrar animal: {err}")
             if connection and not connection.is_closed():
                 connection.rollback()
-            return None
+            
+            # Manejar errores específicos de PostgreSQL
+            if hasattr(err, 'args') and len(err.args) > 0 and isinstance(err.args[0], dict) and err.args[0].get('C') == '23505':
+                # Error de clave duplicada
+                if 'numero_arete' in str(err.args[0]):
+                    raise Exception("El número de arete ya existe. Por favor, use un número diferente.")
+                else:
+                    raise Exception("Ya existe un registro con estos datos.")
+            
+            # Si no es un error de clave duplicada, re-raise la excepción original
+            raise Exception(f"Error al registrar animal: {str(err)}")
 
     def obtener_animal_por_id(self, animal_id, usuario_id=None):
         """
@@ -453,6 +475,23 @@ class DatabaseConnection:
             print(f"Obteniendo animales para usuario_id: {usuario_id}")
             connection = self.get_connection()
             with connection.cursor() as cursor:
+                # Primero verificar si la tabla existe
+                cursor.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_name = 'animales'
+                """)
+                tabla_existe = cursor.fetchone()[0] > 0
+                print(f"Tabla animales existe: {tabla_existe}")
+                
+                if not tabla_existe:
+                    print("La tabla animales no existe")
+                    return []
+                
+                # Verificar si hay datos en la tabla
+                cursor.execute("SELECT COUNT(*) FROM animales")
+                total_animales = cursor.fetchone()[0]
+                print(f"Total de animales en la tabla: {total_animales}")
+                
                 # Consulta base con filtro de usuario
                 query = """
                     SELECT * FROM animales 
@@ -485,6 +524,8 @@ class DatabaseConnection:
                 
                 if resultados:
                     print(f"Primer resultado: {resultados[0]}")
+                else:
+                    print("No se encontraron animales para este usuario")
                 
                 return resultados
         
@@ -689,6 +730,12 @@ def get_db_connection():
         from urllib.parse import urlparse
         parsed = urlparse(db_url)
         
+        # Configuración de SSL para Render
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
         # Establecer la conexión con pg8000 usando parámetros separados
         connection = pg8000.Connection(
             host=parsed.hostname,
@@ -696,11 +743,12 @@ def get_db_connection():
             user=parsed.username,
             password=parsed.password,
             database=parsed.path[1:] if parsed.path else 'ganadero_anwt',
-            ssl_context=True
+            ssl_context=ssl_context
         )
         
         logger.info("Conexión a PostgreSQL establecida exitosamente")
         return connection
     except Exception as err:
         logger.error(f"Error al conectar a PostgreSQL: {err}")
-        raise Exception(f"Error de conexión a PostgreSQL: {err}")
+        # Retornar None en lugar de lanzar excepción para manejo más elegante
+        return None

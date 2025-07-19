@@ -28,11 +28,6 @@ from src.cloudinary_handler import upload_file, delete_file, get_public_id_from_
 
 import pg8000
 
-# Configuración para Vercel (sin carpetas locales)
-# UPLOAD_FOLDERS = ['static/comprobantes', 'static/uploads/animales', 'static/uploads/perfiles']
-# for folder in UPLOAD_FOLDERS:
-#     os.makedirs(folder, exist_ok=True)
-
 # Inicializar el chatbot
 chatbot = None
 
@@ -44,14 +39,7 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 app.config['SECRET_KEY'] = os.urandom(24)  # Clave secreta para sesiones
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 
-# Función para validar archivos de imagen de perfil
-def allowed_file_perfil(filename):
-    """Verifica si el archivo tiene una extensión permitida para perfiles"""
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# Función para validar archivos de imagen general
+# Función para validar archivos de imagen
 def allowed_file(filename):
     """Verifica si el archivo tiene una extensión permitida para imágenes"""
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -66,6 +54,23 @@ auditoria = SistemaAuditoria(get_db_connection)
 
 # Inicializar el sistema de alarmas
 alarmas = SistemaAlarmas(get_db_connection)
+
+# Función global para convertir tuplas a diccionarios
+def tuple_to_dict(tuple_data, columns):
+    """Convierte una tupla de datos en un diccionario usando los nombres de columnas"""
+    return dict(zip(columns, tuple_data))
+
+# Función para manejar errores de conexión a la base de datos
+def handle_db_connection_error():
+    """Maneja errores de conexión a la base de datos de forma elegante"""
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            return False, "Error al conectar con la base de datos"
+        return True, conn
+    except Exception as e:
+        app.logger.error(f"Error de conexión a la base de datos: {str(e)}")
+        return False, "Error al conectar con la base de datos"
 
 # Configurar el planificador de tareas para verificar alarmas
 def verificar_alarmas_programadas():
@@ -90,43 +95,7 @@ scheduler.add_job(func=verificar_alarmas_programadas, trigger="date", run_date=d
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
-# Función para servir archivos estáticos (COMENTADA para Vercel)
-# def serve_file(directory, filename, mimetype=None):
-#     """Función centralizada para servir archivos estáticos de forma segura"""
-#     if '..' in filename or filename.startswith('/'):
-#         return "Acceso denegado", 403
-#         
-#     filepath = os.path.join(directory, filename)
-#     if not os.path.exists(filepath):
-#         return f"Archivo no encontrado: {filename}", 404
-#         
-#     if mimetype is None:
-#         # Determinar el tipo MIME basado en la extensión
-#         extension = filename.split('.')[-1].lower() if '.' in filename else ''
-#         mimetypes = {
-#             'jpg': 'image/jpeg',
-#             'jpeg': 'image/jpeg',
-#             'png': 'image/png',
-#             'gif': 'image/gif',
-#             'pdf': 'application/pdf'
-#         }
-#         mimetype = mimetypes.get(extension)
-#     
-#     return send_from_directory(directory, filename, mimetype=mimetype)
 
-# Ruta unificada para servir archivos (COMENTADA para Vercel)
-# @app.route('/files/<path:filename>')
-# def serve_uploaded_file(filename):
-#     """Ruta unificada para servir archivos desde diferentes directorios"""
-#     # Determinar el directorio correcto basado en el prefijo del archivo
-#     if filename.startswith('comprobantes/'):
-#         return serve_file('static/comprobantes', filename.replace('comprobantes/', ''))
-#     elif filename.startswith('animales/'):
-#         return serve_file('static/uploads/animales', filename.replace('animales/', ''))
-#     elif filename.startswith('perfiles/'):
-#         return serve_file('static/uploads/perfiles', filename.replace('perfiles/', ''))
-#     else:
-#         return "Tipo de archivo no válido", 400
 
 @app.route('/')
 def inicio():
@@ -156,7 +125,8 @@ def login():
             user = db_connection.validate_user(username, password)
             if user:
                 session['username'] = username
-                session['usuario_id'] = user['id']
+                # user es una tupla, el ID está en la posición 0
+                session['usuario_id'] = user[0]
                 app.logger.info(f"Usuario {username} ha iniciado sesión correctamente")
                 return redirect(url_for('dashboard'))
             else:
@@ -226,7 +196,8 @@ def dashboard():
         
         # Obtener estadísticas generales filtradas por usuario
         cursor.execute("SELECT COUNT(*) as total FROM animales WHERE usuario_id = %s", (usuario_id,))
-        total_animales = cursor.fetchone()['total']
+        total_animales_result = cursor.fetchone()
+        total_animales = total_animales_result[0] if total_animales_result else 0
         
         cursor.execute("""
             SELECT COUNT(*) as total 
@@ -234,7 +205,8 @@ def dashboard():
             JOIN animales a ON g.animal_id = a.id
             WHERE g.estado = 'En Gestación' AND a.usuario_id = %s
         """, (usuario_id,))
-        total_gestaciones = cursor.fetchone()['total']
+        total_gestaciones_result = cursor.fetchone()
+        total_gestaciones = total_gestaciones_result[0] if total_gestaciones_result else 0
         
         cursor.execute("""
             SELECT SUM(rl.total_dia) as total 
@@ -242,7 +214,8 @@ def dashboard():
             JOIN animales a ON rl.animal_id = a.id
             WHERE a.usuario_id = %s
         """, (usuario_id,))
-        total_leche = cursor.fetchone()['total'] or 0
+        total_leche_result = cursor.fetchone()
+        total_leche = total_leche_result[0] if total_leche_result and total_leche_result[0] else 0
         
         # Contar vacunaciones pendientes de todas las tablas filtradas por usuario
         # 1. Carbunco
@@ -253,7 +226,8 @@ def dashboard():
             WHERE c.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
             AND a.usuario_id = %s
         """, (usuario_id,))
-        total_carbunco = cursor.fetchone()['total']
+        total_carbunco_result = cursor.fetchone()
+        total_carbunco = total_carbunco_result[0] if total_carbunco_result else 0
         
         # 2. Vitaminización
         cursor.execute("""
@@ -263,7 +237,8 @@ def dashboard():
             WHERE v.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
             AND a.usuario_id = %s
         """, (usuario_id,))
-        total_vitaminizacion = cursor.fetchone()['total']
+        total_vitaminizacion_result = cursor.fetchone()
+        total_vitaminizacion = total_vitaminizacion_result[0] if total_vitaminizacion_result else 0
         
         # 3. Desparasitación
         cursor.execute("""
@@ -273,7 +248,8 @@ def dashboard():
             WHERE d.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
             AND a.usuario_id = %s
         """, (usuario_id,))
-        total_desparasitacion = cursor.fetchone()['total']
+        total_desparasitacion_result = cursor.fetchone()
+        total_desparasitacion = total_desparasitacion_result[0] if total_desparasitacion_result else 0
         
         # 4. Vacunas tradicionales (si existen)
         try:
@@ -285,7 +261,8 @@ def dashboard():
                 AND v.fecha_proxima BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
                 AND a.usuario_id = %s
             """, (usuario_id,))
-            total_vacunas = cursor.fetchone()['total']
+            total_vacunas_result = cursor.fetchone()
+            total_vacunas = total_vacunas_result[0] if total_vacunas_result else 0
         except Exception as e:
             app.logger.error(f"Error al contar vacunas tradicionales: {str(e)}")
             total_vacunas = 0
@@ -310,7 +287,13 @@ def dashboard():
             ORDER BY g.fecha_probable_parto ASC
             LIMIT 5
         """, (usuario_id,))
-        proximos_partos = cursor.fetchall()
+        proximos_partos_raw = cursor.fetchall()
+        
+        # Convertir próximos partos a diccionarios
+        partos_columns = ['id', 'animal_id', 'fecha_monta', 'fecha_probable_parto', 'estado', 'observaciones', 'usuario_id', 'fecha_actualizacion', 'nombre_animal', 'numero_arete']
+        proximos_partos = []
+        for parto in proximos_partos_raw:
+            proximos_partos.append(tuple_to_dict(parto, partos_columns))
         
         # Obtener próximas vacunaciones (próximos 30 días) de todas las tablas filtradas por usuario
         # 1. Carbunco
@@ -387,11 +370,36 @@ def dashboard():
         # Combinar todas las vacunaciones próximas
         proximas_vacunaciones = proximas_carbunco + proximas_vitaminizacion + proximas_desparasitacion + proximas_vacunas
         
+        # Definir las columnas para cada tipo de vacunación
+        carbunco_columns = ['id', 'fecha_registro', 'fecha_programada', 'tipo_vacuna', 'producto', 'nombre_animal', 'numero_arete', 'animal_id']
+        vitaminizacion_columns = ['id', 'fecha_aplicacion', 'fecha_programada', 'tipo_vacuna', 'producto', 'nombre_animal', 'numero_arete', 'animal_id']
+        desparasitacion_columns = ['id', 'fecha_registro', 'fecha_programada', 'tipo_vacuna', 'producto', 'nombre_animal', 'numero_arete', 'animal_id']
+        vacuna_columns = ['id', 'animal_id', 'tipo', 'fecha_aplicacion', 'fecha_proxima', 'estado', 'observaciones', 'nombre_animal', 'numero_arete', 'tipo_vacuna', 'fecha_programada']
+        
+        # Convertir cada tipo de vacunación
+        proximas_vacunaciones_dict = []
+        
+        # Convertir carbunco
+        for item in proximas_carbunco:
+            proximas_vacunaciones_dict.append(tuple_to_dict(item, carbunco_columns))
+        
+        # Convertir vitaminización
+        for item in proximas_vitaminizacion:
+            proximas_vacunaciones_dict.append(tuple_to_dict(item, vitaminizacion_columns))
+        
+        # Convertir desparasitación
+        for item in proximas_desparasitacion:
+            proximas_vacunaciones_dict.append(tuple_to_dict(item, desparasitacion_columns))
+        
+        # Convertir vacunas tradicionales
+        for item in proximas_vacunas:
+            proximas_vacunaciones_dict.append(tuple_to_dict(item, vacuna_columns))
+        
         # Ordenar por fecha programada
-        proximas_vacunaciones = sorted(proximas_vacunaciones, key=lambda x: x['fecha_programada'])
+        proximas_vacunaciones_dict = sorted(proximas_vacunaciones_dict, key=lambda x: x['fecha_programada'])
         
         # Limitar a 5 resultados
-        proximas_vacunaciones = proximas_vacunaciones[:5]
+        proximas_vacunaciones = proximas_vacunaciones_dict[:5]
         
         # Obtener gestaciones próximas para alertas
         cursor.execute("""
@@ -636,29 +644,41 @@ def animales():
                     WHERE table_name = 'animales'
                 """)
                 result = cursor.fetchone()
-                tabla_existe = result['count'] > 0 if result else False
+                tabla_existe = result[0] > 0 if result else False
                 print(f"Tabla animales existe: {tabla_existe}")
                 
                 if tabla_existe:
                     # Verificar cuántos animales hay en total
                     cursor.execute("SELECT COUNT(*) FROM animales")
                     result = cursor.fetchone()
-                    total_animales = result['count'] if result else 0
+                    total_animales = result[0] if result else 0
                     print(f"Total de animales en la tabla: {total_animales}")
                     
                     # Verificar cuántos animales tiene este usuario
                     cursor.execute("SELECT COUNT(*) FROM animales WHERE usuario_id = %s", (usuario_id,))
                     result = cursor.fetchone()
-                    animales_usuario = result['count'] if result else 0
+                    animales_usuario = result[0] if result else 0
                     print(f"Animales del usuario {usuario_id}: {animales_usuario}")
         except Exception as e:
             print(f"Error al verificar tabla: {str(e)}")
         
-        animales = db_connection.obtener_animales(usuario_id)
-        print(f"Animales obtenidos para usuario {usuario_id}: {len(animales) if animales else 0}")
+        animales_raw = db_connection.obtener_animales(usuario_id)
+        print(f"Animales obtenidos para usuario {usuario_id}: {len(animales_raw) if animales_raw else 0}")
         
-        if animales:
-            print(f"Primer animal: {animales[0]}")
+        if animales_raw and len(animales_raw) > 0:
+            print(f"Primer animal: {animales_raw[0]}")
+        else:
+            print("No se encontraron animales para este usuario")
+            animales_raw = []
+        
+        # Definir las columnas de la tabla animales
+        animales_columns = ['id', 'numero_arete', 'nombre', 'sexo', 'raza', 'condicion', 'fecha_nacimiento', 'propietario', 'foto_path', 'padre_arete', 'madre_arete', 'usuario_id', 'fecha_registro']
+        
+        # Convertir animales a diccionarios
+        animales = []
+        if animales_raw:
+            for animal in animales_raw:
+                animales.append(tuple_to_dict(animal, animales_columns))
         
         # Importar datetime para calcular la edad
         from datetime import datetime
@@ -670,6 +690,27 @@ def animales():
             try:
                 connection = db_connection.get_connection()
                 with connection.cursor() as cursor:
+                    # Verificar si la tabla existe, si no, crearla
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS animales (
+                            id SERIAL PRIMARY KEY,
+                            numero_arete VARCHAR(50) UNIQUE NOT NULL,
+                            nombre VARCHAR(100),
+                            sexo VARCHAR(10) NOT NULL,
+                            raza VARCHAR(100),
+                            condicion VARCHAR(50) NOT NULL,
+                            fecha_nacimiento DATE,
+                            propietario VARCHAR(200),
+                            foto_path VARCHAR(500),
+                            padre_arete VARCHAR(50),
+                            madre_arete VARCHAR(50),
+                            usuario_id INTEGER,
+                            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    connection.commit()
+                    print("Tabla animales creada o verificada")
+                    
                     # Insertar animales de prueba
                     animales_prueba = [
                         ('Vaca001', 'Lola', 'Hembra', 'Holstein', 'Vaca', '2020-03-15', 'Juan Pérez', None, None, usuario_id),
@@ -678,20 +719,33 @@ def animales():
                     ]
                     
                     for arete, nombre, sexo, raza, condicion, fecha_nac, propietario, padre, madre, user_id in animales_prueba:
-                        cursor.execute("""
-                            INSERT INTO animales (numero_arete, nombre, sexo, raza, condicion, fecha_nacimiento, propietario, padre_arete, madre_arete, usuario_id)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (arete, nombre, sexo, raza, condicion, fecha_nac, propietario, padre, madre, user_id))
+                        try:
+                            cursor.execute("""
+                                INSERT INTO animales (numero_arete, nombre, sexo, raza, condicion, fecha_nacimiento, propietario, padre_arete, madre_arete, usuario_id)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (arete, nombre, sexo, raza, condicion, fecha_nac, propietario, padre, madre, user_id))
+                        except Exception as e:
+                            print(f"Error al insertar animal {arete}: {str(e)}")
+                            # Si es error de duplicado, continuar
+                            if "duplicate key" in str(e).lower():
+                                continue
                     
                     connection.commit()
                     print("Animales de prueba creados exitosamente")
                     
                     # Obtener los animales nuevamente
-                    animales = db_connection.obtener_animales(usuario_id)
-                    print(f"Animales después de crear prueba: {len(animales) if animales else 0}")
+                    animales_raw = db_connection.obtener_animales(usuario_id)
+                    print(f"Animales después de crear prueba: {len(animales_raw) if animales_raw else 0}")
+                    
+                    # Convertir animales a diccionarios
+                    animales = []
+                    for animal in animales_raw:
+                        animales.append(tuple_to_dict(animal, animales_columns))
                     
             except Exception as e:
                 print(f"Error al crear animales de prueba: {str(e)}")
+                import traceback
+                traceback.print_exc()
         
         return render_template('animales.html', animales=animales, now=now)
     except Exception as e:
@@ -701,6 +755,20 @@ def animales():
         flash('Error al cargar los animales', 'error')
         from datetime import datetime
         return render_template('animales.html', animales=[], now=datetime.now().date())
+
+@app.route('/verificar-arete/<numero_arete>')
+@login_required
+def verificar_arete(numero_arete):
+    """Verifica si un número de arete ya existe"""
+    try:
+        connection = db_connection.get_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM animales WHERE numero_arete = %s AND usuario_id = %s", 
+                         (numero_arete, session.get('usuario_id')))
+            resultado = cursor.fetchone()
+            return jsonify({'existe': resultado is not None})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/registrar-animal', methods=['GET', 'POST'])
 @login_required
@@ -769,23 +837,27 @@ def registrar_animal():
             
             # Registrar el animal en la base de datos
             print(f"Intentando registrar animal con datos: {datos_animal}")
-            animal_id = db_connection.registrar_animal(datos_animal)
-            print(f"Resultado del registro: {animal_id}")
-            
-            if animal_id:
-                # Registrar la actividad en el sistema de auditoría
-                auditoria.registrar_actividad(
-                    accion='Registrar', 
-                    modulo='Animales', 
-                    descripcion=f'Se registró el animal: {nombre} (ID: {animal_id})'
-                )
-                flash('Animal registrado exitosamente', 'success')
-                return redirect(url_for('animales'))
-            else:
-                flash('Error al registrar el animal en la base de datos', 'error')
+            try:
+                animal_id = db_connection.registrar_animal(datos_animal)
+                print(f"Resultado del registro: {animal_id}")
+                
+                if animal_id:
+                    # Registrar la actividad en el sistema de auditoría
+                    auditoria.registrar_actividad(
+                        accion='Registrar', 
+                        modulo='Animales', 
+                        descripcion=f'Se registró el animal: {nombre} (ID: {animal_id})'
+                    )
+                    flash('Animal registrado exitosamente', 'success')
+                    return redirect(url_for('animales'))
+                else:
+                    flash('Error al registrar el animal en la base de datos', 'error')
+            except Exception as e:
+                flash(str(e), 'error')
+                return render_template('registrar_animal.html')
                 
         except Exception as e:
-            flash(f'Error al registrar el animal: {str(e)}', 'error')
+            flash(f'Error inesperado: {str(e)}', 'error')
     
     return render_template('registrar_animal.html')
 
@@ -797,11 +869,17 @@ def editar_animal(animal_id):
         return redirect(url_for('login'))
     
     # Obtener información del animal
-    animal = db_connection.obtener_animal_por_id(animal_id)
+    animal_raw = db_connection.obtener_animal_por_id(animal_id)
     
-    if not animal:
+    if not animal_raw:
         flash('Animal no encontrado', 'error')
         return redirect(url_for('animales'))
+    
+    # Definir las columnas de la tabla animales
+    animales_columns = ['id', 'numero_arete', 'nombre', 'sexo', 'raza', 'condicion', 'fecha_nacimiento', 'propietario', 'foto_path', 'padre_arete', 'madre_arete', 'usuario_id', 'fecha_registro']
+    
+    # Convertir animal a diccionario
+    animal = tuple_to_dict(animal_raw, animales_columns)
     
     # Si no hay foto o es la imagen por defecto, usar imagen por defecto
     if not animal['foto_path'] or animal['foto_path'] == 'static/images/upload-image-placeholder.svg':
@@ -859,11 +937,17 @@ def eliminar_animal(animal_id):
     
     try:
         # Obtener información del animal antes de eliminarlo
-        animal = db_connection.obtener_animal_por_id(animal_id)
+        animal_raw = db_connection.obtener_animal_por_id(animal_id)
         
-        if not animal:
+        if not animal_raw:
             flash('Animal no encontrado', 'error')
             return redirect(url_for('animales'))
+        
+        # Definir las columnas de la tabla animales
+        animales_columns = ['id', 'numero_arete', 'nombre', 'sexo', 'raza', 'condicion', 'fecha_nacimiento', 'propietario', 'foto_path', 'padre_arete', 'madre_arete', 'usuario_id', 'fecha_registro']
+        
+        # Convertir animal a diccionario
+        animal = tuple_to_dict(animal_raw, animales_columns)
         
         # Si el animal tiene una imagen en Cloudinary, eliminarla
         if animal['foto_path'] and 'cloudinary' in animal['foto_path']:
@@ -901,7 +985,12 @@ def editar_perfil():
     
     try:
         # Obtener información actual del usuario desde la base de datos
-        usuario = db_connection.obtener_usuario_por_id(usuario_id)
+        db = get_db_connection()
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM usuarios WHERE id = %s", (usuario_id,))
+        usuario = cursor.fetchone()
+        cursor.close()
+        db.close()
         print("Usuario obtenido:", usuario)
         
         if request.method == 'POST':
@@ -926,10 +1015,15 @@ def editar_perfil():
                 return render_template('editar_perfil.html', usuario=usuario)
             print("Validación de email pasada")
             # Verificar si el correo ya está en uso por otro usuario
-            if email != usuario.get('email'):
-                usuario_existente = db_connection.obtener_usuario_por_email(email)
+            if email != usuario[2]:  # usuario[2] es el email en la tupla
+                db = get_db_connection()
+                cursor = db.cursor()
+                cursor.execute("SELECT * FROM usuarios WHERE email = %s", (email,))
+                usuario_existente = cursor.fetchone()
+                cursor.close()
+                db.close()
                 print("Verificando email duplicado:", usuario_existente)
-                if usuario_existente and str(usuario_existente.get('id')) != str(usuario_id):
+                if usuario_existente and str(usuario_existente[0]) != str(usuario_id):  # usuario_existente[0] es el id
                     print("Validación fallida: email duplicado")
                     flash('Este correo electrónico ya está en uso', 'error')
                     return render_template('editar_perfil.html', usuario=usuario)
@@ -947,8 +1041,8 @@ def editar_perfil():
             if foto_perfil and foto_perfil.filename:
                 print("Entrando al bloque de procesamiento de imagen")
                 print("Validando archivo:", foto_perfil.filename)
-                print("Resultado de allowed_file_perfil:", allowed_file_perfil(foto_perfil.filename))
-                if not allowed_file_perfil(foto_perfil.filename):
+                print("Resultado de allowed_file:", allowed_file(foto_perfil.filename))
+                if not allowed_file(foto_perfil.filename):
                     print("Validación fallida: formato no permitido")
                     flash('Formato de imagen no permitido. Use JPG, PNG o GIF', 'error')
                     return render_template('editar_perfil.html', usuario=usuario)
@@ -981,35 +1075,40 @@ def editar_perfil():
             try:
                 # Actualizar información en la base de datos
                 # Si los campos no existen, primero intentamos crearlos
-                connection = db_connection.get_connection()
-                with connection.cursor() as cursor:
-                    # Verificar si las columnas cargo y dirección existen
-                    cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM information_schema.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'usuarios' 
-                        AND COLUMN_NAME = 'cargo'
-                    """)
-                    if cursor.fetchone()[0] == 0:
-                        # La columna cargo no existe, la creamos
-                        cursor.execute("ALTER TABLE usuarios ADD COLUMN cargo VARCHAR(100) DEFAULT NULL")
-                        app.logger.info("Columna 'cargo' agregada a la tabla usuarios")
-                    
-                    cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM information_schema.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'usuarios' 
-                        AND COLUMN_NAME = 'direccion'
-                    """)
-                    if cursor.fetchone()[0] == 0:
-                        # La columna dirección no existe, la creamos
-                        cursor.execute("ALTER TABLE usuarios ADD COLUMN direccion VARCHAR(255) DEFAULT NULL")
-                        app.logger.info("Columna 'direccion' agregada a la tabla usuarios")
-                    
-                    connection.commit()
-                    print("Verificación de columnas completada")
+                db = get_db_connection()
+                cursor = db.cursor()
+                # Verificar si las columnas cargo y dirección existen (PostgreSQL)
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = 'public' 
+                    AND TABLE_NAME = 'usuarios' 
+                    AND COLUMN_NAME = 'cargo'
+                """)
+                cargo_exists = cursor.fetchone()[0] > 0
+                
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = 'public' 
+                    AND TABLE_NAME = 'usuarios' 
+                    AND COLUMN_NAME = 'direccion'
+                """)
+                direccion_exists = cursor.fetchone()[0] > 0
+                
+                # Crear columnas si no existen
+                if not cargo_exists:
+                    cursor.execute("ALTER TABLE usuarios ADD COLUMN cargo VARCHAR(100) DEFAULT NULL")
+                    app.logger.info("Columna 'cargo' agregada a la tabla usuarios")
+                
+                if not direccion_exists:
+                    cursor.execute("ALTER TABLE usuarios ADD COLUMN direccion VARCHAR(255) DEFAULT NULL")
+                    app.logger.info("Columna 'direccion' agregada a la tabla usuarios")
+                
+                db.commit()
+                cursor.close()
+                db.close()
+                print("Verificación de columnas completada")
             except Exception as e:
                 app.logger.error(f"Error al verificar/crear columnas: {e}")
                 print("Error al verificar columnas:", e)
@@ -1017,7 +1116,38 @@ def editar_perfil():
             
             print("Antes de actualizar perfil en BD")
             # Actualizar información en la base de datos
-            db_connection.actualizar_perfil_usuario(usuario_id, nombre, email, telefono, foto_path, cargo, direccion)
+            db = get_db_connection()
+            cursor = db.cursor()
+            
+            # Construir la consulta de actualización
+            update_query = """
+                UPDATE usuarios 
+                SET nombre = %s, email = %s, telefono = %s
+            """
+            params = [nombre, email, telefono]
+            
+            # Agregar foto si existe
+            if foto_path:
+                update_query += ", foto_perfil = %s"
+                params.append(foto_path)
+            
+            # Agregar cargo si existe
+            if cargo:
+                update_query += ", cargo = %s"
+                params.append(cargo)
+            
+            # Agregar dirección si existe
+            if direccion:
+                update_query += ", direccion = %s"
+                params.append(direccion)
+            
+            update_query += " WHERE id = %s"
+            params.append(usuario_id)
+            
+            cursor.execute(update_query, params)
+            db.commit()
+            cursor.close()
+            db.close()
             print("Después de actualizar perfil en BD")
             
             # Actualizar sesión
@@ -1036,10 +1166,23 @@ def editar_perfil():
             flash('Perfil actualizado exitosamente', 'success')
             return redirect(url_for('dashboard'))
         
-        # Cargar foto de perfil de la sesión si existe
-        usuario['foto_perfil'] = session.get('foto_perfil', '/static/images/default-avatar.png')
+        # Convertir usuario de tupla a diccionario para el template
+        usuario_dict = {
+            'id': usuario[0],
+            'username': usuario[1],
+            'email': usuario[2],
+            'password': usuario[3],
+            'nombre': usuario[4],
+            'apellido': usuario[5],
+            'telefono': usuario[6],
+            'foto_perfil': usuario[7] if len(usuario) > 7 and usuario[7] else session.get('foto_perfil', '/static/images/default-avatar.png'),
+            'cargo': usuario[8] if len(usuario) > 8 else None,
+            'direccion': usuario[9] if len(usuario) > 9 else None,
+            'rol': usuario[10] if len(usuario) > 10 else 'Usuario',
+            'fecha_registro': usuario[11] if len(usuario) > 11 else None
+        }
         
-        return render_template('editar_perfil.html', usuario=usuario)
+        return render_template('editar_perfil.html', usuario=usuario_dict)
     
     except Exception as e:
         print("Error capturado en except:", e)
@@ -1192,7 +1335,7 @@ def gestacion():
             AND condicion IN ('Vaca', 'Vacona')
         """, (session['usuario_id'],))
         result = cursor.fetchone()
-        count = result['count'] if result else 0
+        count = result[0] if result else 0
         print(f"Animales hembra para gestación del usuario {session['usuario_id']}: {count}")
         
         # Obtener animales hembra del usuario actual
@@ -1610,18 +1753,13 @@ def registrar_fiebre_aftosa():
             # Insertar registro de fiebre aftosa
             insert_query = """
                 INSERT INTO fiebre_aftosa (
-                    fecha_registro, numero_certificado, nombre_propietario,
-                    identificacion, nombre_predio, provincia_id, canton_id,
-                    parroquia_id, tipo_explotacion, nombre_vacunador,
-                    cedula_vacunador, fecha_proxima_aplicacion,
-                    usuario_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    animal_id, fecha_aplicacion, fecha_proxima,
+                    dosis, observaciones, usuario_id
+                ) VALUES (%s, %s, %s, %s, %s, %s)
             """
             values = (
-                fecha_registro, numero_certificado, nombre_propietario,
-                identificacion, nombre_predio, provincia_id, canton_id,
-                parroquia_id, tipo_explotacion, vacunador_nombre,
-                vacunador_cedula, proxima_aplicacion, session['usuario_id']
+                None, fecha_registro, proxima_aplicacion,
+                f"Producto: {producto}, Lote: {lote}", observaciones, session['usuario_id']
             )
             
             app.logger.info(f'Ejecutando query: {insert_query}')
@@ -1737,7 +1875,15 @@ def pastizales():
             GROUP BY p.id
         """, (session['usuario_id'],))
         
-        pastizales = cursor.fetchall()
+        pastizales_raw = cursor.fetchall()
+        
+        # Definir las columnas de la tabla pastizales + animales_actuales
+        pastizales_columns = ['id', 'nombre', 'ubicacion', 'area', 'estado', 'descripcion', 'usuario_id', 'fecha_registro', 'animales_actuales']
+        
+        # Convertir pastizales a diccionarios
+        pastizales = []
+        for pastizal in pastizales_raw:
+            pastizales.append(tuple_to_dict(pastizal, pastizales_columns))
         
         return render_template('pastizales.html', pastizales=pastizales)
     
@@ -1756,14 +1902,14 @@ def registrar_pastizal():
     
     try:
         nombre = request.form['nombre']
-        dimension = float(request.form['dimension'])
+        area = float(request.form['dimension'])  # El campo del formulario sigue siendo 'dimension'
         tipo_hierba = request.form['tipo_hierba']
         
         cursor.execute("""
             INSERT INTO pastizales (
                 nombre, area, estado, descripcion, usuario_id
             ) VALUES (%s, %s, 'Activo', %s, %s)
-        """, (nombre, dimension, f"Tipo de hierba: {tipo_hierba}", session['usuario_id']))
+        """, (nombre, area, f"Tipo de hierba: {tipo_hierba}", session['usuario_id']))
         
         conn.commit()
         flash('Pastizal registrado exitosamente', 'success')
@@ -1794,16 +1940,22 @@ def obtener_animales_disponibles(pastizal_id):
             GROUP BY p.id
         """, (pastizal_id, session['usuario_id']))
         
-        pastizal = cursor.fetchone()
+        pastizal_raw = cursor.fetchone()
         
-        if not pastizal:
+        if not pastizal_raw:
             return jsonify({'error': 'Pastizal no encontrado'}), 404
+        
+        # Convertir tupla a diccionario
+        pastizales_columns = ['id', 'nombre', 'ubicacion', 'area', 'estado', 'descripcion', 'usuario_id', 'fecha_registro', 'animales_actuales']
+        pastizal = dict(zip(pastizales_columns, pastizal_raw))
         
         # Obtener animales disponibles
         cursor.execute("""
             SELECT 
                 a.id,
                 a.nombre,
+                a.numero_arete as arete,
+                a.raza,
                 a.condicion as categoria,
                 a.estado
             FROM animales a
@@ -1813,7 +1965,13 @@ def obtener_animales_disponibles(pastizal_id):
             ORDER BY a.nombre
         """, (session['usuario_id'],))
         
-        animales = cursor.fetchall()
+        animales_raw = cursor.fetchall()
+        
+        # Convertir animales a diccionarios
+        animales_columns = ['id', 'nombre', 'arete', 'raza', 'categoria', 'estado']
+        animales = []
+        for animal in animales_raw:
+            animales.append(dict(zip(animales_columns, animal)))
         
         # Calcular capacidad máxima basada en el área (3.5m² por animal)
         capacidad_maxima = int(pastizal['area'] / 3.5) if pastizal['area'] else 0
@@ -1849,7 +2007,7 @@ def asignar_animales(pastizal_id):
             FROM pastizales p
             LEFT JOIN animales_pastizal ap ON p.id = ap.pastizal_id AND ap.fecha_retiro IS NULL
             WHERE p.id = %s AND p.usuario_id = %s
-            GROUP BY p.id, p.area
+            GROUP BY p.id
         """, (pastizal_id, session['usuario_id']))
         
         pastizal = cursor.fetchone()
@@ -1952,19 +2110,29 @@ def inseminaciones():
             print("No hay registros de inseminaciones")
         print("==== FIN DE REGISTROS ====\n\n")
         
-        # Obtener animales hembras del usuario actual disponibles para inseminación
+        # Obtener todos los animales del usuario actual disponibles para inseminación
         cursor.execute("""
-            SELECT id, nombre, numero_arete, condicion
+            SELECT id, nombre, numero_arete, condicion, sexo
             FROM animales 
-            WHERE usuario_id = %s AND sexo = 'Hembra'
-            AND condicion IN ('Vaca', 'Vacona')
+            WHERE usuario_id = %s
             ORDER BY nombre
         """, (session['usuario_id'],))
         animales = cursor.fetchall()
         
+        # Convertir animales de tuplas a diccionarios para el template
+        animales_dict = []
+        for animal in animales:
+            animales_dict.append({
+                'id': animal[0],
+                'nombre': animal[1],
+                'numero_arete': animal[2],
+                'condicion': animal[3],
+                'sexo': animal[4] if len(animal) > 4 else None
+            })
+        
         return render_template('inseminaciones.html', 
                              inseminaciones=inseminaciones,
-                             animales=animales)
+                             animales=animales_dict)
     
     except Exception as e:
         flash(f'Error al cargar las inseminaciones: {str(e)}', 'danger')
@@ -1978,7 +2146,7 @@ def inseminaciones():
 def agregar_inseminacion():
     try:
         animal_id = request.form['animal_id']
-        fecha = request.form['fecha_inseminacion']
+        fecha = request.form['fecha']
         tipo = request.form['tipo']
         semental = request.form.get('semental', '')
         raza_semental = request.form.get('raza_semental', '')
@@ -2058,7 +2226,7 @@ def eliminar_inseminacion():
 def editar_inseminacion(id):
     try:
         animal_id = request.form['animal_id']
-        fecha = request.form['fecha_inseminacion']
+        fecha = request.form['fecha']
         tipo = request.form['tipo']
         semental = request.form.get('semental', '')
         raza_semental = request.form.get('raza_semental', '')
@@ -2075,12 +2243,11 @@ def editar_inseminacion(id):
         if not cursor.fetchone():
             raise Exception("La inseminación no existe")
         
-        # Verificar que el animal existe y es válido
+        # Verificar que el animal existe y pertenece al usuario
         cursor.execute("""
             SELECT id FROM animales 
-            WHERE id = %s AND sexo = 'Hembra' 
-            AND condicion IN ('Vaca', 'Vacona')
-        """, (animal_id,))
+            WHERE id = %s AND usuario_id = %s
+        """, (animal_id, session['usuario_id']))
         if not cursor.fetchone():
             raise Exception("El animal seleccionado no es válido")
         
@@ -2282,10 +2449,7 @@ def eliminar_genealogia(id):
         cursor.close()
         db.close()
 
-@app.route('/registro_leche')
-@login_required
-def registro_leche_redirect():
-    return redirect(url_for('registro_leche.vista_registro_leche'))
+
 
 @app.route('/registro_leche/obtener/<int:id>')
 @login_required
@@ -2297,7 +2461,7 @@ def obtener_registro_leche(id):
         cursor.execute("""
             SELECT p.*, a.nombre as nombre_animal,
                    TO_CHAR(p.fecha, 'YYYY-MM-DD') as fecha_formato
-            FROM produccion_leche p
+            FROM registro_leche p
             JOIN animales a ON p.animal_id = a.id
             WHERE p.id = %s
         """, (id,))
@@ -2342,7 +2506,7 @@ def editar_registro_leche(id):
         cursor = db.cursor()
         
         cursor.execute("""
-            UPDATE produccion_leche
+            UPDATE registro_leche
             SET animal_id = %s,
                 fecha = %s,
                 cantidad_manana = %s,
@@ -2422,10 +2586,10 @@ def ventas_leche():
         
         return render_template('ventas_leche.html',
                              ventas=ventas,
-                             total_hoy=totales_hoy['total_litros'] or 0,
-                             ingresos_hoy=totales_hoy['total_ingresos'] or 0,
-                             total_mes=totales_mes['total_litros'] or 0,
-                             ingresos_mes=totales_mes['total_ingresos'] or 0)
+                             total_hoy=totales_hoy[0] or 0 if totales_hoy else 0,
+                             ingresos_hoy=totales_hoy[1] or 0 if totales_hoy else 0,
+                             total_mes=totales_mes[0] or 0 if totales_mes else 0,
+                             ingresos_mes=totales_mes[1] or 0 if totales_mes else 0)
     
     except Exception as e:
         flash(f'Error al cargar las ventas: {str(e)}', 'danger')
@@ -2588,7 +2752,8 @@ def ingresos():
             FROM ingresos 
             WHERE DATE(fecha) = CURRENT_DATE
         """)
-        total_hoy = cursor.fetchone()['total'] or 0
+        total_hoy_result = cursor.fetchone()
+        total_hoy = total_hoy_result[0] if total_hoy_result and total_hoy_result[0] else 0
         
         # Calcular totales para el mes actual
         cursor.execute("""
@@ -2597,7 +2762,8 @@ def ingresos():
             WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE) 
             AND EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM CURRENT_DATE)
         """)
-        total_mes = cursor.fetchone()['total'] or 0
+        total_mes_result = cursor.fetchone()
+        total_mes = total_mes_result[0] if total_mes_result and total_mes_result[0] else 0
         
         # Calcular totales para el año actual
         cursor.execute("""
@@ -2605,7 +2771,8 @@ def ingresos():
             FROM ingresos 
             WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE)
         """)
-        total_anio = cursor.fetchone()['total'] or 0
+        total_anio_result = cursor.fetchone()
+        total_anio = total_anio_result[0] if total_anio_result and total_anio_result[0] else 0
         
         return render_template('ingresos.html',
                              ingresos=ingresos,
@@ -2838,7 +3005,8 @@ def gastos():
             FROM gastos 
             WHERE DATE(fecha) = CURRENT_DATE
         """)
-        total_hoy = cursor.fetchone()['total'] or 0
+        total_hoy_result = cursor.fetchone()
+        total_hoy = total_hoy_result[0] if total_hoy_result and total_hoy_result[0] else 0
         
         # Calcular totales para el mes actual
         cursor.execute("""
@@ -2847,7 +3015,8 @@ def gastos():
             WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE) 
             AND EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM CURRENT_DATE)
         """)
-        total_mes = cursor.fetchone()['total'] or 0
+        total_mes_result = cursor.fetchone()
+        total_mes = total_mes_result[0] if total_mes_result and total_mes_result[0] else 0
         
         # Calcular totales para el año actual
         cursor.execute("""
@@ -2855,7 +3024,8 @@ def gastos():
             FROM gastos 
             WHERE EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE)
         """)
-        total_anio = cursor.fetchone()['total'] or 0
+        total_anio_result = cursor.fetchone()
+        total_anio = total_anio_result[0] if total_anio_result and total_anio_result[0] else 0
         
         return render_template('gastos.html',
                              gastos=gastos,
@@ -3107,14 +3277,16 @@ def reportes_financieros():
             FROM ingresos 
             WHERE EXTRACT(YEAR FROM fecha) = %s
         """, (anio_actual,))
-        total_ingresos_anual = float(cursor.fetchone()['total'])
+        total_ingresos_result = cursor.fetchone()
+        total_ingresos_anual = float(total_ingresos_result[0]) if total_ingresos_result and total_ingresos_result[0] else 0.0
         
         cursor.execute("""
             SELECT COALESCE(SUM(monto), 0) as total
             FROM gastos 
             WHERE EXTRACT(YEAR FROM fecha) = %s
         """, (anio_actual,))
-        total_gastos_anual = float(cursor.fetchone()['total'])
+        total_gastos_result = cursor.fetchone()
+        total_gastos_anual = float(total_gastos_result[0]) if total_gastos_result and total_gastos_result[0] else 0.0
         
         balance_anual = total_ingresos_anual - total_gastos_anual
         
@@ -3214,8 +3386,8 @@ def descargar_reporte_pdf():
         gastos_por_categoria = cursor.fetchall()
         
         # Calcular totales
-        total_ingresos = sum(float(ingreso['total']) for ingreso in ingresos_por_categoria)
-        total_gastos = sum(float(gasto['total']) for gasto in gastos_por_categoria)
+        total_ingresos = sum(float(ingreso[1]) for ingreso in ingresos_por_categoria)
+        total_gastos = sum(float(gasto[1]) for gasto in gastos_por_categoria)
         balance = total_ingresos - total_gastos
         
         # Preparar contexto para la plantilla
@@ -3436,14 +3608,14 @@ def editar_pastizal(pastizal_id):
     
     try:
         nombre = request.form['nombre']
-        dimension = float(request.form['dimension'])
+        area = float(request.form['dimension'])  # El campo del formulario sigue siendo 'dimension'
         tipo_hierba = request.form['tipo_hierba']
         
         cursor.execute("""
             UPDATE pastizales 
-            SET nombre = %s, area = %s, descripcion = %s 
+            SET nombre = %s, area = %s, descripcion = %s
             WHERE id = %s AND usuario_id = %s
-        """, (nombre, dimension, f"Tipo de hierba: {tipo_hierba}", pastizal_id, session['usuario_id']))
+        """, (nombre, area, f"Tipo de hierba: {tipo_hierba}", pastizal_id, session['usuario_id']))
         
         conn.commit()
         flash('Pastizal actualizado exitosamente', 'success')
@@ -3577,11 +3749,18 @@ def detalles_pastizal(pastizal_id):
             GROUP BY p.id
         """, (pastizal_id, session['usuario_id']))
         
-        pastizal = cursor.fetchone()
+        pastizal_raw = cursor.fetchone()
         
-        if not pastizal:
+        if not pastizal_raw:
             flash('Pastizal no encontrado', 'danger')
             return redirect(url_for('pastizales'))
+        
+        # Convertir tupla a diccionario
+        # Definir las columnas de la tabla pastizales + animales_actuales
+        pastizales_columns = ['id', 'nombre', 'ubicacion', 'area', 'estado', 'descripcion', 'usuario_id', 'fecha_registro', 'animales_actuales']
+        
+        # Convertir pastizal a diccionario
+        pastizal = tuple_to_dict(pastizal_raw, pastizales_columns)
         
         # Obtener lista de animales en el pastizal
         cursor.execute("""
@@ -3592,7 +3771,14 @@ def detalles_pastizal(pastizal_id):
             ORDER BY ap.fecha_asignacion DESC
         """, (pastizal_id,))
         
-        animales = cursor.fetchall()
+        animales_raw = cursor.fetchall()
+        
+        # Convertir animales a diccionarios
+        animales_columns = ['id', 'numero_arete', 'nombre', 'sexo', 'raza', 'condicion', 'fecha_nacimiento', 'propietario', 'foto_path', 'padre_arete', 'madre_arete', 'usuario_id', 'fecha_registro', 'fecha_asignacion']
+        
+        animales = []
+        for animal in animales_raw:
+            animales.append(tuple_to_dict(animal, animales_columns))
         
         return render_template('detalles_pastizal.html', pastizal=pastizal, animales=animales)
         
@@ -4183,344 +4369,8 @@ def detalles_carbunco(id):
         return jsonify({'error': str(e)}), 500
 
 def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        # Crear tabla de usuarios si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                nombre VARCHAR(100),
-                apellido VARCHAR(100),
-                telefono VARCHAR(20),
-                direccion TEXT,
-                foto_perfil VARCHAR(500),
-                cargo VARCHAR(100),
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Crear tabla de animales si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS animales (
-                id SERIAL PRIMARY KEY,
-                numero_arete VARCHAR(50) UNIQUE NOT NULL,
-                nombre VARCHAR(100),
-                sexo VARCHAR(10) NOT NULL CHECK (sexo IN ('Macho', 'Hembra')),
-                raza VARCHAR(100),
-                condicion VARCHAR(20) NOT NULL CHECK (condicion IN ('Toro', 'Torete', 'Vaca', 'Vacona', 'Ternero', 'Ternera')),
-                fecha_nacimiento DATE,
-                propietario VARCHAR(200),
-                foto_path VARCHAR(500),
-                padre_arete VARCHAR(50),
-                madre_arete VARCHAR(50),
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de inseminaciones si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS inseminaciones (
-                id SERIAL PRIMARY KEY,
-                animal_id INT NOT NULL,
-                fecha_inseminacion DATE NOT NULL,
-                tipo_inseminacion VARCHAR(50) NOT NULL,
-                semental VARCHAR(100) NOT NULL,
-                raza_semental VARCHAR(100),
-                codigo_pajuela VARCHAR(100),
-                inseminador VARCHAR(100),
-                observaciones TEXT,
-                estado VARCHAR(50) DEFAULT 'Pendiente',
-                exitosa BOOLEAN DEFAULT FALSE,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (animal_id) REFERENCES animales(id)
-            )
-        """)
-        
-        # Crear tabla de carbunco si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS carbunco (
-                id SERIAL PRIMARY KEY,
-                fecha_registro DATE NOT NULL,
-                producto VARCHAR(100) NOT NULL,
-                lote VARCHAR(50),
-                vacunador VARCHAR(100),
-                aplicacion_general BOOLEAN DEFAULT TRUE,
-                proxima_aplicacion DATE,
-                usuario_id INT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de relación carbunco_animal si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS carbunco_animal (
-                id SERIAL PRIMARY KEY,
-                carbunco_id INT NOT NULL,
-                animal_id INT NOT NULL,
-                FOREIGN KEY (carbunco_id) REFERENCES carbunco(id),
-                FOREIGN KEY (animal_id) REFERENCES animales(id)
-            )
-        """)
-        
-        # Verificar si la tabla inseminaciones existe y tiene las columnas necesarias
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'inseminaciones'
-        """)
-        
-        if cursor.fetchone()[0] == 0:
-            # La tabla no existe, ya se creó arriba
-            pass
-        else:
-            # Verificar si faltan columnas y agregarlas
-            columnas_faltantes = [
-                ("raza_semental", "VARCHAR(100)", "semental"),
-                ("codigo_pajuela", "VARCHAR(100)", "raza_semental"),
-                ("inseminador", "VARCHAR(100)", "codigo_pajuela"),
-                ("exitosa", "BOOLEAN DEFAULT FALSE", "observaciones")
-            ]
-            
-            for columna, definicion, after in columnas_faltantes:
-                cursor.execute("""
-                    SELECT COUNT(*) 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'inseminaciones' 
-                    AND column_name = %s
-                """, (columna,))
-                
-                if cursor.fetchone()[0] == 0:
-                    cursor.execute(f"""
-                        ALTER TABLE inseminaciones 
-                        ADD COLUMN {columna} {definicion}
-                    """)
-        
-        # Crear tabla de genealogía si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS genealogia (
-                id SERIAL PRIMARY KEY,
-                animal_id INT NOT NULL,
-                padre_arete VARCHAR(50),
-                madre_arete VARCHAR(50),
-                abuelo_paterno_arete VARCHAR(50),
-                abuela_paterna_arete VARCHAR(50),
-                abuelo_materno_arete VARCHAR(50),
-                abuela_materna_arete VARCHAR(50),
-                observaciones TEXT,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (animal_id) REFERENCES animales(id),
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de animales_pastizal si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS animales_pastizal (
-                id SERIAL PRIMARY KEY,
-                animal_id INT NOT NULL,
-                pastizal_id INT NOT NULL,
-                fecha_asignacion DATE NOT NULL,
-                fecha_retiro DATE,
-                observaciones TEXT,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (animal_id) REFERENCES animales(id),
-                FOREIGN KEY (pastizal_id) REFERENCES pastizales(id),
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de pastizales si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS pastizales (
-                id SERIAL PRIMARY KEY,
-                nombre VARCHAR(100) NOT NULL,
-                ubicacion TEXT,
-                area DECIMAL(10,2),
-                estado VARCHAR(20) DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo', 'Mantenimiento')),
-                descripcion TEXT,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de registro_leche si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS registro_leche (
-                id SERIAL PRIMARY KEY,
-                animal_id INT NOT NULL,
-                fecha DATE NOT NULL,
-                cantidad_manana DECIMAL(10,2),
-                cantidad_tarde DECIMAL(10,2),
-                total_dia DECIMAL(10,2),
-                observaciones TEXT,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (animal_id) REFERENCES animales(id),
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de ventas_leche si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ventas_leche (
-                id SERIAL PRIMARY KEY,
-                fecha DATE NOT NULL,
-                cantidad_litros DECIMAL(10,2) NOT NULL,
-                precio_litro DECIMAL(10,2) NOT NULL,
-                total DECIMAL(10,2) NOT NULL,
-                comprador VARCHAR(200),
-                forma_pago VARCHAR(20) DEFAULT 'Efectivo' CHECK (forma_pago IN ('Efectivo', 'Transferencia', 'Cheque', 'Otro')),
-                estado_pago VARCHAR(20) DEFAULT 'Pendiente' CHECK (estado_pago IN ('Pagado', 'Pendiente', 'Parcial')),
-                observaciones TEXT,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de ingresos si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ingresos (
-                id SERIAL PRIMARY KEY,
-                fecha DATE NOT NULL,
-                categoria VARCHAR(100) NOT NULL,
-                monto DECIMAL(10,2) NOT NULL,
-                descripcion TEXT,
-                comprobante VARCHAR(255),
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de gastos si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS gastos (
-                id SERIAL PRIMARY KEY,
-                fecha DATE NOT NULL,
-                categoria VARCHAR(100) NOT NULL,
-                monto DECIMAL(10,2) NOT NULL,
-                descripcion TEXT,
-                comprobante VARCHAR(255),
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de desparasitaciones si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS desparasitaciones (
-                id SERIAL PRIMARY KEY,
-                fecha_registro DATE NOT NULL,
-                producto VARCHAR(100) NOT NULL,
-                lote VARCHAR(50),
-                aplicacion_general BOOLEAN DEFAULT TRUE,
-                proxima_aplicacion DATE,
-                usuario_id INT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de vitaminizaciones si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS vitaminizaciones (
-                id SERIAL PRIMARY KEY,
-                fecha_registro DATE NOT NULL,
-                producto VARCHAR(100) NOT NULL,
-                lote VARCHAR(50),
-                aplicacion_general BOOLEAN DEFAULT TRUE,
-                proxima_aplicacion DATE,
-                usuario_id INT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de fiebre_aftosa si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS fiebre_aftosa (
-                id SERIAL PRIMARY KEY,
-                fecha_registro DATE NOT NULL,
-                producto VARCHAR(100) NOT NULL,
-                lote VARCHAR(50),
-                aplicacion_general BOOLEAN DEFAULT TRUE,
-                proxima_aplicacion DATE,
-                usuario_id INT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de gestaciones si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS gestaciones (
-                id SERIAL PRIMARY KEY,
-                animal_id INT NOT NULL,
-                fecha_monta DATE NOT NULL,
-                fecha_probable_parto DATE NOT NULL,
-                estado VARCHAR(20) NOT NULL DEFAULT 'En Gestación' CHECK (estado IN ('En Gestación', 'Finalizado', 'Abortado')),
-                observaciones TEXT,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (animal_id) REFERENCES animales(id),
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de auditoria si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS auditoria (
-                id SERIAL PRIMARY KEY,
-                usuario_id INT,
-                accion VARCHAR(50) NOT NULL,
-                modulo VARCHAR(50) NOT NULL,
-                descripcion TEXT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de config_alarmas si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS config_alarmas (
-                id SERIAL PRIMARY KEY,
-                tipo VARCHAR(50) NOT NULL,
-                activo BOOLEAN DEFAULT TRUE,
-                dias_antes INTEGER DEFAULT 7,
-                usuario_id INT,
-                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        # Crear tabla de alarmas_enviadas si no existe
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS alarmas_enviadas (
-                id SERIAL PRIMARY KEY,
-                tipo VARCHAR(50) NOT NULL,
-                descripcion TEXT,
-                fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                usuario_id INT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        """)
-        
-        conn.commit()
-        print("Base de datos inicializada correctamente")
-    except Exception as e:
-        print(f"Error al inicializar la base de datos: {str(e)}")
-        conn.rollback()
-    finally:
-        cursor.close()
-        conn.close()
+    # Las tablas ya existen en la base de datos, no es necesario crearlas
+    print("Base de datos ya está inicializada")
 
 
 # Función equipos restaurada de manera segura
@@ -4919,5 +4769,11 @@ def render_html_report(template_name, context, filename):
         return 'Error al generar reporte', 500
 
 if __name__ == '__main__':
-    init_db()
+    try:
+        print("Inicializando base de datos...")
+        init_db()
+        print("Base de datos inicializada correctamente")
+    except Exception as e:
+        print(f"Error al inicializar la base de datos: {str(e)}")
+    
     app.run(debug=True)

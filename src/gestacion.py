@@ -15,7 +15,7 @@ def registrar_gestacion(animal_id, fecha_monta, observaciones):
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT id, sexo, condicion 
+            SELECT id, sexo, condicion, usuario_id
             FROM animales 
             WHERE id = %s
         """, (animal_id,))
@@ -24,10 +24,11 @@ def registrar_gestacion(animal_id, fecha_monta, observaciones):
         if not animal:
             return False, "Animal no encontrado"
         
-        if animal['sexo'] != 'Hembra':
+        # animal es una tupla: (id, sexo, condicion, usuario_id)
+        if animal[1] != 'Hembra':  # sexo está en la posición 1
             return False, "Solo se puede registrar gestación para animales hembra"
             
-        if animal['condicion'] not in ['Vaca', 'Vacona']:
+        if animal[2] not in ['Vaca', 'Vacona']:  # condicion está en la posición 2
             return False, "Solo se puede registrar gestación para vacas o vaconas"
         
         # Calcular fecha probable de parto (283 días después de la monta)
@@ -45,10 +46,11 @@ def registrar_gestacion(animal_id, fecha_monta, observaciones):
         
         # Insertar el registro de gestación
         cursor.execute("""
-            INSERT INTO gestaciones (animal_id, fecha_monta, tipo_inseminacion, 
-                                semental, observaciones, estado, fecha_probable_parto)
-            VALUES (%s, %s, 'Natural', 'No especificado', %s, 'En Gestación', %s)
-        """, (animal_id, fecha_monta, observaciones, fecha_probable_parto.strftime('%Y-%m-%d')))
+            INSERT INTO gestaciones (animal_id, fecha_monta, fecha_probable_parto, 
+                                estado, observaciones, usuario_id)
+            VALUES (%s, %s, %s, 'En Gestación', %s, %s)
+        """, (animal_id, fecha_monta, fecha_probable_parto.strftime('%Y-%m-%d'), 
+              observaciones, animal[3]))  # usuario_id está en la posición 3
         
         conn.commit()
         cursor.close()
@@ -70,14 +72,14 @@ def obtener_gestaciones(usuario_id=None):
                 FROM gestaciones g
                 JOIN animales a ON g.animal_id = a.id
                 WHERE a.usuario_id = %s
-                ORDER BY g.fecha_actualizacion DESC
+                ORDER BY g.fecha_registro DESC
             """, (usuario_id,))
         else:
             cursor.execute("""
                 SELECT g.*, a.numero_arete, a.nombre, a.condicion
                 FROM gestaciones g
                 JOIN animales a ON g.animal_id = a.id
-                ORDER BY g.fecha_actualizacion DESC
+                ORDER BY g.fecha_registro DESC
             """)
         
         gestaciones = dictfetchall(cursor)

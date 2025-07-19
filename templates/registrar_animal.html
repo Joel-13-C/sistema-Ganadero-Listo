@@ -11,6 +11,32 @@
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
         width: 100%;
     }
+    
+    .is-valid {
+        border-color: #28a745 !important;
+        box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+    }
+    
+    .is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+    }
+    
+    .invalid-feedback {
+        display: block;
+        width: 100%;
+        margin-top: 0.25rem;
+        font-size: 0.875em;
+        color: #dc3545;
+    }
+    
+    .valid-feedback {
+        display: block;
+        width: 100%;
+        margin-top: 0.25rem;
+        font-size: 0.875em;
+        color: #28a745;
+    }
 </style>
 {% endblock %}
 
@@ -147,7 +173,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     const fotoInput = document.getElementById('fotoInput');
     const previewImage = document.getElementById('previewImage');
+    const numeroAreteInput = document.getElementById('numero_arete');
+    let areteTimeout;
 
+    // Validación de foto
     fotoInput.addEventListener('change', function(event) {
         const file = event.target.files[0];
         if (file) {
@@ -156,6 +185,62 @@ document.addEventListener('DOMContentLoaded', function() {
                 previewImage.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+    });
+
+    // Validación de número de arete en tiempo real
+    numeroAreteInput.addEventListener('input', function() {
+        clearTimeout(areteTimeout);
+        const numeroArete = this.value.trim();
+        
+        if (numeroArete.length >= 2) {
+            areteTimeout = setTimeout(function() {
+                fetch(`/verificar-arete/${numeroArete}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.existe) {
+                            numeroAreteInput.classList.add('is-invalid');
+                            numeroAreteInput.classList.remove('is-valid');
+                            // Mostrar mensaje de error
+                            let errorDiv = numeroAreteInput.parentNode.querySelector('.invalid-feedback');
+                            if (!errorDiv) {
+                                errorDiv = document.createElement('div');
+                                errorDiv.className = 'invalid-feedback';
+                                numeroAreteInput.parentNode.appendChild(errorDiv);
+                            }
+                            errorDiv.textContent = 'Este número de arete ya existe';
+                        } else {
+                            numeroAreteInput.classList.remove('is-invalid');
+                            numeroAreteInput.classList.add('is-valid');
+                            // Remover mensaje de error
+                            const errorDiv = numeroAreteInput.parentNode.querySelector('.invalid-feedback');
+                            if (errorDiv) {
+                                errorDiv.remove();
+                            }
+                            // Mostrar mensaje de éxito
+                            let successDiv = numeroAreteInput.parentNode.querySelector('.valid-feedback');
+                            if (!successDiv) {
+                                successDiv = document.createElement('div');
+                                successDiv.className = 'valid-feedback';
+                                numeroAreteInput.parentNode.appendChild(successDiv);
+                            }
+                            successDiv.textContent = 'Número de arete disponible';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al verificar arete:', error);
+                    });
+            }, 500); // Esperar 500ms después de que el usuario deje de escribir
+        } else {
+            numeroAreteInput.classList.remove('is-invalid', 'is-valid');
+            const errorDiv = numeroAreteInput.parentNode.querySelector('.invalid-feedback');
+            if (errorDiv) {
+                errorDiv.remove();
+            }
+            const successDiv = numeroAreteInput.parentNode.querySelector('.valid-feedback');
+            if (successDiv) {
+                successDiv.remove();
+            }
         }
     });
 
@@ -172,6 +257,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 field.classList.remove('is-invalid');
             }
         });
+
+        // Verificar si el número de arete es válido
+        if (numeroAreteInput.classList.contains('is-invalid')) {
+            isValid = false;
+            event.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Número de Arete Duplicado',
+                text: 'El número de arete ingresado ya existe. Por favor, use un número diferente.',
+                confirmButtonText: 'Entendido'
+            });
+            return;
+        }
 
         if (!isValid) {
             event.preventDefault();

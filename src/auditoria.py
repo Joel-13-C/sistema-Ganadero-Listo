@@ -18,47 +18,8 @@ class SistemaAuditoria:
         self._crear_tabla_si_no_existe()
     
     def _crear_tabla_si_no_existe(self):
-        """Crea la tabla de auditoría si no existe"""
-        try:
-            conn = self.db_connection()
-            if not conn:
-                logger.error("No se pudo conectar a la base de datos para crear tabla de auditoría")
-                return
-                
-            cursor = conn.cursor()
-            
-            # Verificar si la tabla existe
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'auditoria'
-            """)
-            
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS auditoria (
-                        id SERIAL PRIMARY KEY,
-                        usuario_id INT,
-                        usuario_nombre VARCHAR(100),
-                        accion VARCHAR(255) NOT NULL,
-                        modulo VARCHAR(100) NOT NULL,
-                        descripcion TEXT,
-                        fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        ip VARCHAR(45),
-                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-                    )
-                """)
-                conn.commit()
-                logger.info("Tabla de auditoría creada correctamente")
-            
-        except Exception as e:
-            logger.error(f"Error al crear tabla de auditoría: {e}")
-        finally:
-            if 'cursor' in locals() and cursor:
-                cursor.close()
-            if 'conn' in locals() and conn:
-                conn.close()
+        """La tabla de auditoría ya existe en la base de datos"""
+        pass
     
     def registrar_actividad(self, accion, modulo, descripcion=None):
         """
@@ -86,10 +47,9 @@ class SistemaAuditoria:
             
             cursor.execute("""
                 INSERT INTO auditoria (
-                    usuario_id, usuario_nombre, accion, 
-                    modulo, descripcion, ip
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (usuario_id, usuario_nombre, accion, modulo, descripcion, ip))
+                    usuario_id, accion, tabla, detalles
+                ) VALUES (%s, %s, %s, %s)
+            """, (usuario_id, accion, modulo, descripcion))
             
             conn.commit()
             logger.info(f"Actividad registrada: {accion} en {modulo}")
@@ -124,7 +84,7 @@ class SistemaAuditoria:
             
             cursor.execute("""
                 SELECT * FROM auditoria 
-                ORDER BY fecha_hora DESC 
+                ORDER BY fecha_registro DESC 
                 LIMIT %s
             """, (limite,))
             
@@ -164,14 +124,13 @@ class SistemaAuditoria:
                     SELECT 
                         a.id,
                         a.accion,
-                        a.modulo,
-                        a.descripcion,
-                        a.fecha_hora,
-                        a.usuario_nombre,
-                        a.ip
+                        a.tabla,
+                        a.detalles,
+                        a.fecha_registro,
+                        a.usuario_id
                     FROM auditoria a
                     WHERE a.usuario_id = %s
-                    ORDER BY a.fecha_hora DESC 
+                    ORDER BY a.fecha_registro DESC 
                     LIMIT %s
                 """, (usuario_id, limite))
             else:
@@ -180,13 +139,12 @@ class SistemaAuditoria:
                     SELECT 
                         a.id,
                         a.accion,
-                        a.modulo,
-                        a.descripcion,
-                        a.fecha_hora,
-                        a.usuario_nombre,
-                        a.ip
+                        a.tabla,
+                        a.detalles,
+                        a.fecha_registro,
+                        a.usuario_id
                     FROM auditoria a
-                    ORDER BY a.fecha_hora DESC 
+                    ORDER BY a.fecha_registro DESC 
                     LIMIT %s
                 """, (limite,))
             
@@ -194,11 +152,11 @@ class SistemaAuditoria:
             
             # Formatear las fechas para mejor visualización
             for actividad in actividades:
-                if actividad['fecha_hora']:
-                    actividad['fecha_formato'] = actividad['fecha_hora'].strftime('%d/%m/%Y %H:%M')
+                if actividad['fecha_registro']:
+                    actividad['fecha_formato'] = actividad['fecha_registro'].strftime('%d/%m/%Y %H:%M')
                     # Calcular tiempo relativo
                     ahora = datetime.now()
-                    diferencia = ahora - actividad['fecha_hora']
+                    diferencia = ahora - actividad['fecha_registro']
                     if diferencia.days > 0:
                         actividad['tiempo_relativo'] = f"Hace {diferencia.days} días"
                     elif diferencia.seconds > 3600:
